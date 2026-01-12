@@ -293,6 +293,7 @@ fun BulletPoint(text: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PermissionsPage(
     accessibilityEnabled: Boolean,
@@ -382,6 +383,7 @@ fun PermissionsPage(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PermissionCard(
     title: String,

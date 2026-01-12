@@ -8,6 +8,7 @@ import app.gonull.data.local.entity.UsageLogEntity
 import app.gonull.ui.screens.blocking.BlockingOverlayActivity
 import app.gonull.util.Constants
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 
 class AppBlockerService : AccessibilityService() {
 
@@ -60,7 +61,7 @@ class AppBlockerService : AccessibilityService() {
     private suspend fun updateBlockedAppsCache() {
         blockedAppsCache = database.blockedAppDao()
             .getActiveBlockedApps()
-            .kotlinx.coroutines.flow.first()
+            .first()
             .map { it.packageName }
             .toSet()
         lastCacheUpdate = System.currentTimeMillis()

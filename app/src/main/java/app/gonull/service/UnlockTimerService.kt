@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
-import app.gonull.R
 import app.gonull.data.local.AppDatabase
 import app.gonull.ui.MainActivity
 import app.gonull.util.Constants
@@ -64,7 +63,7 @@ class UnlockTimerService : Service() {
         return NotificationCompat.Builder(this, Constants.TIMER_CHANNEL_ID)
             .setContentTitle("Unlock in progress")
             .setContentText("$packageName unlocks in $minutes minutes")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Changed to public icon
             .setOngoing(true)
             .setContentIntent(pendingIntent)
             .build()
@@ -77,7 +76,7 @@ class UnlockTimerService : Service() {
         val notification = NotificationCompat.Builder(this, Constants.TIMER_CHANNEL_ID)
             .setContentTitle("Unlock in progress")
             .setContentText("$packageName unlocks in ${minutes}m ${seconds}s")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_lock)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Changed to public icon
             .setOngoing(true)
             .build()
 
@@ -89,7 +88,7 @@ class UnlockTimerService : Service() {
         val notification = NotificationCompat.Builder(this, Constants.TIMER_CHANNEL_ID)
             .setContentTitle("App unlocked")
             .setContentText("$packageName is now accessible for 15 minutes")
-            .setSmallIcon(android.R.drawable.ic_lock_idle_unlock)
+            .setSmallIcon(android.R.drawable.ic_dialog_info) // Changed to public icon
             .setAutoCancel(true)
             .build()
 

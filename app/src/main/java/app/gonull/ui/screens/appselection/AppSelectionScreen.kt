@@ -55,7 +55,7 @@ fun AppSelectionScreen(
                 actions = {
                     if (selectedApps.isNotEmpty()) {
                         TextButton(onClick = {
-                            viewModel.saveSelectedApps()
+                            viewModel.saveSelectedApps(context.packageManager)
                             onNavigateBack()
                         }) {
                             Text(

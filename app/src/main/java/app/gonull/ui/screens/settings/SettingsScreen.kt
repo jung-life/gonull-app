@@ -136,6 +136,7 @@ fun SettingsScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LockModeCard() {
     val context = LocalContext.current
@@ -173,7 +174,7 @@ fun LockModeCard() {
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isLockModeEnabled) GoNullRed else GoNullGray
                     )
-                </Column>
+                }
 
                 Switch(
                     checked = isLockModeEnabled,
@@ -240,6 +241,7 @@ fun LockModeCard() {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PermissionCard(
     title: String,

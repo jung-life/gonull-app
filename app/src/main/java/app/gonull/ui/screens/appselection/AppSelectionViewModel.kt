@@ -65,14 +65,12 @@ class AppSelectionViewModel(
         }
     }
 
-    fun saveSelectedApps() {
+    fun saveSelectedApps(packageManager: PackageManager) {
         viewModelScope.launch {
             _selectedApps.value.forEach { packageName ->
                 val appInfo = _installedApps.value.find { it.packageName == packageName }
                 if (appInfo != null) {
-                    val appName = appInfo.loadLabel(
-                        _installedApps.value.first().loadLabel(null).toString()
-                    ).toString()
+                    val appName = appInfo.loadLabel(packageManager).toString()
 
                     database.blockedAppDao().insertBlockedApp(
                         BlockedAppEntity(
