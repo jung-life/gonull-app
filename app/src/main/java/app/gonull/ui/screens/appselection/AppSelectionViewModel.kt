@@ -1,60 +1,144 @@
 package app.gonull.ui.screens.appselection
 
+import android.app.usage.UsageStatsManager
+import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.BlockedAppEntity
+import app.gonull.util.PermissionHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.util.*
+
+data class AppCategory(
+    val name: String,
+    val apps: List<ApplicationInfo>
+)
+
+data class AppUsageInfo(
+    val packageName: String,
+    val totalTimeInForeground: Long,
+    val usagePercentage: Float // Relative to the most used app
+)
 
 class AppSelectionViewModel(
     private val database: AppDatabase
 ) : ViewModel() {
 
-    private val _installedApps = MutableStateFlow<List<ApplicationInfo>>(emptyList())
-    val installedApps: StateFlow<List<ApplicationInfo>> = _installedApps.asStateFlow()
+    private val _categorizedApps = MutableStateFlow<List<AppCategory>>(emptyList())
+    val categorizedApps: StateFlow<List<AppCategory>> = _categorizedApps.asStateFlow()
 
     private val _selectedApps = MutableStateFlow<Set<String>>(emptySet())
     val selectedApps: StateFlow<Set<String>> = _selectedApps.asStateFlow()
 
+    private val _usageInfoMap = MutableStateFlow<Map<String, AppUsageInfo>>(emptyMap())
+    val usageInfoMap: StateFlow<Map<String, AppUsageInfo>> = _usageInfoMap.asStateFlow()
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    fun loadInstalledApps(packageManager: PackageManager) {
-        viewModelScope.launch {
-            val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-                .filter { app ->
-                    // Filter out system apps that don't have a launcher icon
-                    val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
-                    val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
-                    isUserApp || hasLauncher
-                }
-                .sortedBy { packageManager.getApplicationLabel(it).toString().lowercase() }
+    private val _isLoaded = MutableStateFlow(false)
+    val isLoaded: StateFlow<Boolean> = _isLoaded.asStateFlow()
 
-            _installedApps.value = apps
+    private val _hasUsagePermission = MutableStateFlow(false)
+    val hasUsagePermission: StateFlow<Boolean> = _hasUsagePermission.asStateFlow()
+
+    fun loadApps(context: Context) {
+        val hasPermission = PermissionHelper.hasUsageStatsPermission(context)
+        _hasUsagePermission.value = hasPermission
+
+        viewModelScope.launch {
+            val packageManager = context.packageManager
+            
+            val allApps = withContext(Dispatchers.IO) {
+                packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+                    .filter { app ->
+                        val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
+                        val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
+                        isUserApp || hasLauncher
+                    }
+            }
+
+            var mostUsedTime = 1L
+            val usageMap = mutableMapOf<String, AppUsageInfo>()
+
+            if (hasPermission) {
+                val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+                val calendar = Calendar.getInstance()
+                calendar.add(Calendar.DAY_OF_YEAR, -7)
+                
+                val stats = usageStatsManager.queryAndAggregateUsageStats(
+                    calendar.timeInMillis,
+                    System.currentTimeMillis()
+                )
+
+                stats.forEach { (pkg, stat) ->
+                    val time = stat.totalTimeInForeground
+                    if (time > mostUsedTime) mostUsedTime = time
+                }
+
+                stats.forEach { (pkg, stat) ->
+                    val time = stat.totalTimeInForeground
+                    usageMap[pkg] = AppUsageInfo(
+                        packageName = pkg,
+                        totalTimeInForeground = time,
+                        usagePercentage = time.toFloat() / mostUsedTime
+                    )
+                }
+            }
+            
+            _usageInfoMap.value = usageMap
+
+            val sortedByUsage = allApps.sortedByDescending { usageMap[it.packageName]?.totalTimeInForeground ?: 0L }
+            
+            val mostUsed = if (hasPermission) sortedByUsage.take(10).filter { (usageMap[it.packageName]?.totalTimeInForeground ?: 0L) > 0 } else emptyList()
+            
+            val socialApps = mutableListOf<ApplicationInfo>()
+            val entertainmentApps = mutableListOf<ApplicationInfo>()
+            val productivityApps = mutableListOf<ApplicationInfo>()
+            val otherApps = mutableListOf<ApplicationInfo>()
+
+            val socialKeywords = listOf("facebook", "instagram", "twitter", "x.android", "tiktok", "snapchat", "linkedin", "reddit", "whatsapp", "telegram", "messenger")
+            val entertainmentKeywords = listOf("youtube", "netflix", "disney", "spotify", "twitch", "prime.video", "hulu")
+            val productivityKeywords = listOf("email", "calendar", "slack", "zoom", "teams", "notion", "todoist", "keep")
+
+            allApps.forEach { app ->
+                val pkg = app.packageName.lowercase()
+                when {
+                    socialKeywords.any { pkg.contains(it) } -> socialApps.add(app)
+                    entertainmentKeywords.any { pkg.contains(it) } -> entertainmentApps.add(app)
+                    productivityKeywords.any { pkg.contains(it) } -> productivityApps.add(app)
+                    else -> otherApps.add(app)
+                }
+            }
+
+            val categories = mutableListOf<AppCategory>()
+            if (mostUsed.isNotEmpty()) categories.add(AppCategory("Top Used This Week (Realization Time)", mostUsed))
+            if (socialApps.isNotEmpty()) categories.add(AppCategory("Social & Communication", socialApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+            if (entertainmentApps.isNotEmpty()) categories.add(AppCategory("Entertainment", entertainmentApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+            if (productivityApps.isNotEmpty()) categories.add(AppCategory("Productivity", productivityApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+            if (otherApps.isNotEmpty()) categories.add(AppCategory("All Other Apps", otherApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+
+            _categorizedApps.value = categories
+            
+            if (!_isLoaded.value) {
+                val recommended = (socialApps + entertainmentApps).map { it.packageName }.toSet()
+                _selectedApps.value = recommended
+            }
+            
+            _isLoaded.value = true
         }
     }
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
-        filterApps()
-    }
-
-    private fun filterApps() {
-        val query = _searchQuery.value.lowercase()
-        if (query.isEmpty()) {
-            // Show all apps when search is empty
-            return
-        }
-
-        viewModelScope.launch {
-            // Note: For simplicity in Phase 1, keeping all apps visible
-            // Can implement filtering in Phase 2
-        }
     }
 
     fun toggleAppSelection(packageName: String) {
@@ -68,7 +152,8 @@ class AppSelectionViewModel(
     fun saveSelectedApps(packageManager: PackageManager) {
         viewModelScope.launch {
             _selectedApps.value.forEach { packageName ->
-                val appInfo = _installedApps.value.find { it.packageName == packageName }
+                val categories = _categorizedApps.value
+                val appInfo = categories.flatMap { it.apps }.find { it.packageName == packageName }
                 if (appInfo != null) {
                     val appName = appInfo.loadLabel(packageManager).toString()
 
