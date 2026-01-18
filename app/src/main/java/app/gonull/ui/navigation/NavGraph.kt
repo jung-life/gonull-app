@@ -12,10 +12,13 @@ import app.gonull.ui.screens.home.HomeScreen
 import app.gonull.ui.screens.home.HomeViewModel
 import app.gonull.ui.screens.onboarding.OnboardingScreen
 import app.gonull.ui.screens.settings.SettingsScreen
+import app.gonull.ui.screens.usageinsights.UsageInsightsScreen
+import app.gonull.ui.screens.usageinsights.UsageInsightsViewModel
 import app.gonull.util.PermissionHelper
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
+    object UsageInsights : Screen("usage_insights")
     object Home : Screen("home")
     object AppSelection : Screen("app_selection")
     object Settings : Screen("settings")
@@ -34,8 +37,20 @@ fun NavGraph(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onComplete = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.UsageInsights.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.UsageInsights.route) {
+            val viewModel = UsageInsightsViewModel(database)
+            UsageInsightsScreen(
+                viewModel = viewModel,
+                onComplete = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             )

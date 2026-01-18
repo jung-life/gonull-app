@@ -13,7 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -24,7 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
@@ -56,7 +55,7 @@ fun AppSelectionScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
-                            Icons.Default.ArrowBack,
+                            Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Back",
                             tint = GoNullWhite
                         )
@@ -111,7 +110,23 @@ fun AppSelectionScreen(
 
             if (!isLoaded) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(color = GoNullGreen)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(
+                            text = "Ø",
+                            style = MaterialTheme.typography.headlineLarge.copy(
+                                fontSize = 48.sp,
+                                color = GoNullGreen
+                            )
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(
+                            text = "Loading apps...",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GoNullGray
+                        )
+                    }
                 }
             } else {
                 LazyColumn {
@@ -153,15 +168,14 @@ fun AppSelectionScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UsagePermissionBanner(onClick: () -> Unit) {
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(containerColor = GoNullYellow.copy(alpha = 0.1f)),
         modifier = Modifier.padding(16.dp),
-        border = BoxWithConstraints {
-            androidx.compose.foundation.BorderStroke(1.dp, GoNullYellow.copy(alpha = 0.3f))
-        }
+        border = androidx.compose.foundation.BorderStroke(1.dp, GoNullYellow.copy(alpha = 0.3f))
     ) {
         Row(
             modifier = Modifier.padding(16.dp),

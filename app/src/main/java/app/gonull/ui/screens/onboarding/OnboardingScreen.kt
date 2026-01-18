@@ -309,7 +309,7 @@ fun PermissionsPage(
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(32.dp))
 
         Text(
             text = "Grant Permissions",
@@ -327,34 +327,51 @@ fun PermissionsPage(
             textAlign = TextAlign.Center
         )
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // Permission cards
-        PermissionCard(
-            title = "Accessibility Service",
-            description = "Required to detect when blocked apps open",
-            requirement = "REQUIRED",
-            isGranted = accessibilityEnabled,
-            onClick = { PermissionHelper.openAccessibilitySettings(context) }
-        )
+        // Scrollable permission cards
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            PermissionCard(
+                title = "Accessibility Service",
+                description = "Required to detect when blocked apps open",
+                requirement = "REQUIRED",
+                isGranted = accessibilityEnabled,
+                onClick = { PermissionHelper.openAccessibilitySettings(context) }
+            )
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-        PermissionCard(
-            title = "Display Over Other Apps",
-            description = "Required to show the blocking screen",
-            requirement = "REQUIRED",
-            isGranted = overlayEnabled,
-            onClick = { PermissionHelper.openOverlaySettings(context) }
-        )
+            PermissionCard(
+                title = "Display Over Other Apps",
+                description = "Required to show the blocking screen",
+                requirement = "REQUIRED",
+                isGranted = overlayEnabled,
+                onClick = { PermissionHelper.openOverlaySettings(context) }
+            )
 
-        Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
+
+            PermissionCard(
+                title = "Developer Settings",
+                description = "On some devices, you may need to enable 'Allow screen overlays' in Developer Settings for the blocking screen to work properly",
+                requirement = "IF NEEDED",
+                isGranted = false,
+                onClick = { PermissionHelper.openDeveloperSettings(context) }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
 
         if (accessibilityEnabled && overlayEnabled) {
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = GoNullGreen.copy(alpha = 0.1f)
-                )
+                ),
+                modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.padding(16.dp),
@@ -373,13 +390,14 @@ fun PermissionsPage(
                     )
                 }
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
 
         TextButton(onClick = onBack) {
             Text("← Back", color = GoNullGray)
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -403,36 +421,35 @@ fun PermissionCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.Top
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleMedium,
-                        color = GoNullWhite,
-                        fontWeight = FontWeight.SemiBold
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = GoNullWhite,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Card(
+                    colors = CardDefaults.cardColors(
+                        containerColor = if (requirement == "REQUIRED") GoNullRed.copy(alpha = 0.2f) else GoNullYellow.copy(alpha = 0.2f)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Card(
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (requirement == "REQUIRED") GoNullRed.copy(alpha = 0.2f) else GoNullYellow.copy(alpha = 0.2f)
-                        )
-                    ) {
-                        Text(
-                            text = requirement,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = if (requirement == "REQUIRED") GoNullRed else GoNullYellow,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
+                ) {
+                    Text(
+                        text = requirement,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (requirement == "REQUIRED") GoNullRed else GoNullYellow,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = GoNullGray
+                    color = GoNullGray,
+                    lineHeight = 18.sp
                 )
             }
 

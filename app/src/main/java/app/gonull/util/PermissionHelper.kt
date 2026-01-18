@@ -2,8 +2,10 @@ package app.gonull.util
 
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.app.AppOpsManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Process
 import android.provider.Settings
 import android.view.accessibility.AccessibilityManager
@@ -21,10 +23,27 @@ object PermissionHelper {
     }
 
     fun openAccessibilitySettings(context: Context) {
-        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        // Try to open directly to the app's accessibility service page
+        try {
+            val serviceName = ComponentName(context, "app.gonull.service.AppBlockerService")
+
+            // Create intent with extra to highlight our service
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_HISTORY
+                // Try to pass component name to highlight our service (works on some devices)
+                putExtra(":settings:fragment_args_key", serviceName.flattenToString())
+                putExtra(":settings:show_fragment_args", android.os.Bundle().apply {
+                    putString("component_name", serviceName.flattenToString())
+                })
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback to general accessibility settings
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_HISTORY
+            }
+            context.startActivity(intent)
         }
-        context.startActivity(intent)
     }
 
     fun hasUsageStatsPermission(context: Context): Boolean {
@@ -40,8 +59,17 @@ object PermissionHelper {
     fun openUsageStatsSettings(context: Context) {
         val intent = Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                data = Uri.fromParts("package", context.packageName, null)
+            }
         }
-        context.startActivity(intent)
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Fallback if direct package link fails
+            intent.data = null
+            context.startActivity(intent)
+        }
     }
 
     fun canDrawOverlays(context: Context): Boolean {
@@ -51,8 +79,15 @@ object PermissionHelper {
     fun openOverlaySettings(context: Context) {
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            android.net.Uri.parse("package:${context.packageName}")
+            Uri.parse("package:${context.packageName}")
         ).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    }
+
+    fun openDeveloperSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         context.startActivity(intent)

@@ -11,6 +11,8 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
@@ -19,6 +21,7 @@ import app.gonull.data.local.entity.UnlockRequestEntity
 import app.gonull.service.UnlockTimerService
 import app.gonull.ui.theme.*
 import app.gonull.util.Constants
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class BlockingOverlayActivity : ComponentActivity() {
@@ -57,7 +60,6 @@ class BlockingOverlayActivity : ComponentActivity() {
     private fun emergencyUnlock(packageName: String) {
         val scope = lifecycleScope
         scope.launch {
-            // Log emergency unlock for accountability
             database.usageLogDao().insertLog(
                 app.gonull.data.local.entity.UsageLogEntity(
                     packageName = packageName,
@@ -65,19 +67,15 @@ class BlockingOverlayActivity : ComponentActivity() {
                 )
             )
 
-            // Grant immediate access by creating an already-unlocked request
             val request = UnlockRequestEntity(
                 packageName = packageName,
                 requestedAt = System.currentTimeMillis(),
-                unlocksAt = System.currentTimeMillis(), // Already unlocked
+                unlocksAt = System.currentTimeMillis(),
                 status = Constants.RequestStatus.UNLOCKED,
                 accessDurationMinutes = 15
             )
 
             database.unlockRequestDao().insertRequest(request)
-
-            // TODO: If financial stakes are enabled, charge penalty here
-
             goHome()
         }
     }
@@ -97,7 +95,6 @@ class BlockingOverlayActivity : ComponentActivity() {
 
             database.unlockRequestDao().insertRequest(request)
 
-            // Start timer service
             UnlockTimerService.startTimer(
                 context = applicationContext,
                 packageName = packageName,
@@ -131,8 +128,8 @@ fun BlockingScreen(
     onEmergencyUnlock: () -> Unit,
     onGoBack: () -> Unit
 ) {
-    var showConfirmation by remember { mutableStateOf(false) }
-    var showEmergencyUnlock by remember { mutableStateOf(false) }
+    var showDelayDialog by remember { mutableStateOf(false) }
+    var showBunkerMode by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -144,7 +141,6 @@ fun BlockingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(32.dp)
         ) {
-            // Null symbol
             Text(
                 text = "Ø",
                 style = MaterialTheme.typography.headlineLarge.copy(
@@ -155,95 +151,73 @@ fun BlockingScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // App name
             Text(
                 text = appName,
                 style = MaterialTheme.typography.headlineMedium,
-                color = GoNullWhite
+                color = GoNullWhite,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = "is blocked",
+                text = "Is this app serving your long-term goals?",
                 style = MaterialTheme.typography.bodyLarge,
-                color = GoNullGray
+                color = GoNullGray,
+                textAlign = TextAlign.Center
             )
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Request unlock button
             Button(
-                onClick = { showConfirmation = true },
+                onClick = { showDelayDialog = true },
                 colors = ButtonDefaults.buttonColors(
                     containerColor = GoNullSurface,
                     contentColor = GoNullWhite
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Request Access")
+                Text("Start 30min Access Timer")
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // Emergency unlock button
-            TextButton(onClick = { showEmergencyUnlock = true }) {
+            TextButton(onClick = { showBunkerMode = true }) {
                 Text(
-                    text = "Emergency Access",
+                    text = "Emergency Access (Bunker Mode)",
                     color = GoNullRed
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(32.dp))
 
-            // Go back button
-            TextButton(onClick = onGoBack) {
-                Text(
-                    text = "Go Back",
-                    color = GoNullGray
-                )
+            Button(
+                onClick = onGoBack,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GoNullGreen,
+                    contentColor = GoNullBlack
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Actually, I have things to do", fontWeight = FontWeight.Bold)
             }
         }
 
-        // Confirmation dialog
-        if (showConfirmation) {
-            AlertDialog(
-                onDismissRequest = { showConfirmation = false },
-                containerColor = GoNullSurface,
-                title = {
-                    Text(
-                        "Request unlock?",
-                        color = GoNullWhite
-                    )
-                },
-                text = {
-                    Text(
-                        "You'll get access in 30 minutes. Is it worth the wait?",
-                        color = GoNullGray
-                    )
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        showConfirmation = false
-                        onRequestUnlock()
-                    }) {
-                        Text("Yes, start timer", color = GoNullGreen)
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showConfirmation = false }) {
-                        Text("Never mind", color = GoNullGray)
-                    }
+        if (showDelayDialog) {
+            DelayVerificationDialog(
+                onDismiss = { showDelayDialog = false },
+                onVerified = {
+                    showDelayDialog = false
+                    onRequestUnlock()
                 }
             )
         }
 
-        // Emergency unlock dialog with friction
-        if (showEmergencyUnlock) {
-            EmergencyUnlockDialog(
-                onDismiss = { showEmergencyUnlock = false },
+        if (showBunkerMode) {
+            BunkerModeDialog(
+                onDismiss = { showBunkerMode = false },
                 onUnlock = {
-                    showEmergencyUnlock = false
+                    showBunkerMode = false
                     onEmergencyUnlock()
                 }
             )
@@ -252,89 +226,30 @@ fun BlockingScreen(
 }
 
 @Composable
-fun EmergencyUnlockDialog(
+fun DelayVerificationDialog(
     onDismiss: () -> Unit,
-    onUnlock: () -> Unit
+    onVerified: () -> Unit
 ) {
-    var tapCount by remember { mutableStateOf(0) }
-    val requiredTaps = 50
-
+    var step by remember { mutableIntStateOf(0) }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GoNullSurface,
-        title = {
-            Text(
-                "⚠️ Emergency Unlock",
-                color = GoNullRed
-            )
-        },
+        title = { Text("Are you sure?", color = GoNullWhite) },
         text = {
             Column {
-                Text(
-                    "This should only be used for genuine emergencies.",
-                    color = GoNullGray
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = GoNullBlack
-                    )
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "Tap the button below",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GoNullGray
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        Text(
-                            "$tapCount / $requiredTaps",
-                            style = MaterialTheme.typography.headlineLarge.copy(
-                                fontSize = 48.sp
-                            ),
-                            color = if (tapCount >= requiredTaps) GoNullGreen else GoNullRed
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        Button(
-                            onClick = { tapCount++ },
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (tapCount >= requiredTaps) GoNullGreen else GoNullRed,
-                                contentColor = GoNullBlack
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                if (tapCount >= requiredTaps) "Unlocked - Tap to Continue" else "TAP HERE",
-                                style = MaterialTheme.typography.titleMedium
-                            )
-                        }
-                    }
-                }
-
-                if (tapCount > 0) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        "This emergency unlock will be logged for accountability.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GoNullYellow
-                    )
+                when(step) {
+                    0 -> Text("The timer will take 30 minutes to complete. During this time, the app remains blocked.", color = GoNullGray)
+                    1 -> Text("Research shows the 'itch' to check social media lasts about 15 minutes. Can you wait?", color = GoNullGray)
+                    2 -> Text("Commitment: I am intentionally starting a 30-minute delay to access this app.", color = GoNullWhite, fontWeight = FontWeight.Bold)
                 }
             }
         },
         confirmButton = {
-            if (tapCount >= requiredTaps) {
-                TextButton(onClick = onUnlock) {
-                    Text("Continue to App", color = GoNullGreen)
-                }
+            TextButton(onClick = {
+                if (step < 2) step++ else onVerified()
+            }) {
+                Text(if (step < 2) "Next" else "Confirm & Start", color = GoNullGreen)
             }
         },
         dismissButton = {
@@ -343,4 +258,76 @@ fun EmergencyUnlockDialog(
             }
         }
     )
+}
+
+@Composable
+fun BunkerModeDialog(
+    onDismiss: () -> Unit,
+    onUnlock: () -> Unit
+) {
+    var step by remember { mutableIntStateOf(0) }
+    var inputCode by remember { mutableStateOf("") }
+    val requiredCode = remember { (1000..9999).random().toString() }
+    
+    // Cognitive Friction Task
+    var mathProblem by remember { mutableStateOf(generateMathProblem()) }
+    var mathAnswer by remember { mutableStateOf("") }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = GoNullSurface,
+        title = { Text("Bunker Mode Access", color = GoNullRed) },
+        text = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                when(step) {
+                    0 -> {
+                        Text("Bunker Mode bypasses the timer but requires high cognitive effort to prevent impulsive use.", color = GoNullGray)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("Type this random code to proceed:", color = GoNullWhite)
+                        Text(requiredCode, style = MaterialTheme.typography.headlineMedium, color = GoNullYellow)
+                        OutlinedTextField(
+                            value = inputCode,
+                            onValueChange = { inputCode = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = GoNullWhite, unfocusedTextColor = GoNullWhite)
+                        )
+                    }
+                    1 -> {
+                        Text("Final Barrier: Solve this to prove your prefrontal cortex is active, not your impulsive limbic system.", color = GoNullGray, textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text(mathProblem.first, style = MaterialTheme.typography.headlineMedium, color = GoNullYellow)
+                        OutlinedTextField(
+                            value = mathAnswer,
+                            onValueChange = { mathAnswer = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = GoNullWhite, unfocusedTextColor = GoNullWhite)
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                if (step == 0 && inputCode == requiredCode) {
+                    step++
+                } else if (step == 1 && mathAnswer == mathProblem.second) {
+                    onUnlock()
+                }
+            }) {
+                Text("Verify", color = GoNullRed)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("I'll wait for the timer", color = GoNullGray)
+            }
+        }
+    )
+}
+
+fun generateMathProblem(): Pair<String, String> {
+    val a = (10..50).random()
+    val b = (10..50).random()
+    val c = (2..9).random()
+    return "($a + $b) * $c = ?" to ((a + b) * c).toString()
 }

@@ -13,6 +13,7 @@ import app.gonull.ui.navigation.NavGraph
 import app.gonull.ui.navigation.Screen
 import app.gonull.ui.theme.GoNullTheme
 import app.gonull.util.PermissionHelper
+import app.gonull.util.PreferenceHelper
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,14 +21,16 @@ class MainActivity : ComponentActivity() {
 
         val database = AppDatabase.getDatabase(applicationContext)
 
-        // Determine start destination based on permissions
+        // Determine start destination based on permissions and setup completion
         val hasRequiredPermissions = PermissionHelper.isAccessibilityServiceEnabled(this) &&
                 PermissionHelper.canDrawOverlays(this)
 
-        val startDestination = if (hasRequiredPermissions) {
-            Screen.Home.route
-        } else {
-            Screen.Onboarding.route
+        val hasCompletedSetup = PreferenceHelper.isInitialSetupComplete(this)
+
+        val startDestination = when {
+            !hasRequiredPermissions -> Screen.Onboarding.route
+            !hasCompletedSetup -> Screen.UsageInsights.route
+            else -> Screen.Home.route
         }
 
         setContent {
