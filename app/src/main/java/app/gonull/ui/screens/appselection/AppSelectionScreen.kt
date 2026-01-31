@@ -15,7 +15,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,12 +22,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import app.gonull.ui.theme.*
-import app.gonull.util.PermissionHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,21 +38,38 @@ fun AppSelectionScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    
     val categorizedApps by viewModel.categorizedApps.collectAsState()
     val selectedApps by viewModel.selectedApps.collectAsState()
     val usageInfoMap by viewModel.usageInfoMap.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isLoaded by viewModel.isLoaded.collectAsState()
-    val hasUsagePermission by viewModel.hasUsagePermission.collectAsState()
+    val isSaving by viewModel.isSaving.collectAsState()
 
-    LaunchedEffect(Unit) {
-        viewModel.loadApps(context)
+    // Refresh apps whenever the screen is resumed (e.g., returning from Settings)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadApps(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Select Apps to Block", color = GoNullWhite) },
+                title = {
+                    Text(
+                        "Select Apps to Block",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = GoNullWhite
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(
@@ -62,14 +80,24 @@ fun AppSelectionScreen(
                     }
                 },
                 actions = {
-                    TextButton(onClick = {
-                        viewModel.saveSelectedApps(context.packageManager)
-                        onNavigateBack()
-                    }) {
-                        Text(
-                            "Save (${selectedApps.size})",
-                            color = if (selectedApps.isNotEmpty()) GoNullGreen else GoNullGray
-                        )
+                    TextButton(
+                        onClick = {
+                            viewModel.saveSelectedApps(context, context.packageManager, onNavigateBack)
+                        },
+                        enabled = !isSaving
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(16.dp),
+                                color = GoNullGreen,
+                                strokeWidth = 2.dp
+                            )
+                        } else {
+                            Text(
+                                "Save (${selectedApps.size})",
+                                color = if (selectedApps.isNotEmpty()) GoNullGreen else GoNullGray
+                            )
+                        }
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -84,11 +112,6 @@ fun AppSelectionScreen(
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // Permission Banner if missing
-            if (!hasUsagePermission) {
-                UsagePermissionBanner(onClick = { PermissionHelper.openUsageStatsSettings(context) })
-            }
-
             // Search bar
             OutlinedTextField(
                 value = searchQuery,
@@ -163,37 +186,6 @@ fun AppSelectionScreen(
                         }
                     }
                 }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun UsagePermissionBanner(onClick: () -> Unit) {
-    Card(
-        onClick = onClick,
-        colors = CardDefaults.cardColors(containerColor = GoNullYellow.copy(alpha = 0.1f)),
-        modifier = Modifier.padding(16.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, GoNullYellow.copy(alpha = 0.3f))
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(Icons.Default.Warning, contentDescription = null, tint = GoNullYellow)
-            Spacer(modifier = Modifier.width(16.dp))
-            Column {
-                Text(
-                    "Enable Usage Access",
-                    style = MaterialTheme.typography.titleSmall,
-                    color = GoNullWhite
-                )
-                Text(
-                    "See how much time you're losing to these apps.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GoNullGray
-                )
             }
         }
     }

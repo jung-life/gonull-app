@@ -12,6 +12,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,7 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import app.gonull.ui.theme.*
 import app.gonull.util.PermissionHelper
 import app.gonull.util.TimeFormatter
@@ -36,13 +40,29 @@ fun UsageInsightsScreen(
     onComplete: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val apps by viewModel.apps.collectAsState()
     val selectedApps by viewModel.selectedApps.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val hasUsagePermission by viewModel.hasUsagePermission.collectAsState()
+    val searchQuery by viewModel.searchQuery.collectAsState()
 
+    // Load apps initially
     LaunchedEffect(Unit) {
         viewModel.loadApps(context)
+    }
+
+    // Reload apps when screen becomes visible (after granting permissions)
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                viewModel.loadApps(context)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
 
     Scaffold(
@@ -63,8 +83,7 @@ fun UsageInsightsScreen(
                 Text(
                     text = "Your App Usage - Last 7 Days",
                     style = MaterialTheme.typography.headlineSmall,
-                    color = GoNullWhite,
-                    fontWeight = FontWeight.Bold
+                    color = GoNullWhite
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -74,7 +93,24 @@ fun UsageInsightsScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            // Search bar
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { viewModel.updateSearchQuery(it) },
+                placeholder = { Text("Search apps...", color = GoNullGray) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = GoNullGray) },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = GoNullGreen,
+                    unfocusedBorderColor = GoNullBorder,
+                    focusedTextColor = GoNullWhite,
+                    unfocusedTextColor = GoNullWhite,
+                    cursorColor = GoNullGreen
+                ),
+                singleLine = true
+            )
 
             // Content Area
             Box(
@@ -108,48 +144,6 @@ fun UsageInsightsScreen(
                         }
                     }
 
-                    !hasUsagePermission -> {
-                        // Empty state when permission is not granted
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = GoNullYellow,
-                                modifier = Modifier.size(64.dp)
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Text(
-                                text = "Usage Stats Permission Needed",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = GoNullWhite,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Grant usage access to see which apps are taking your time and get personalized recommendations.",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = GoNullGray,
-                                textAlign = TextAlign.Center
-                            )
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Button(
-                                onClick = { PermissionHelper.openUsageStatsSettings(context) },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = GoNullGreen,
-                                    contentColor = GoNullBlack
-                                )
-                            ) {
-                                Text("Grant Permission")
-                            }
-                        }
-                    }
-
                     apps.isEmpty() && !isLoading -> {
                         // Empty state when no apps found
                         Box(
@@ -179,25 +173,75 @@ fun UsageInsightsScreen(
                     }
 
                     else -> {
+                        // Filter apps based on search query
+                        val filteredApps = apps.filter { appInfo ->
+                            if (searchQuery.isEmpty()) true
+                            else {
+                                val appName = context.packageManager.getApplicationLabel(appInfo.applicationInfo).toString()
+                                appName.contains(searchQuery, ignoreCase = true) ||
+                                        appInfo.applicationInfo.packageName.contains(searchQuery, ignoreCase = true)
+                            }
+                        }
+
+                        // Separate usual suspects from other apps
+                        val usualSuspects = filteredApps.filter { it.isUsualSuspect }
+                        val otherApps = filteredApps.filter { !it.isUsualSuspect }
+
                         // App list
                         LazyColumn(
                             contentPadding = PaddingValues(bottom = 80.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(
-                                items = apps,
-                                key = { it.applicationInfo.packageName }
-                            ) { appInfo ->
-                                val isSelected = selectedApps.contains(appInfo.applicationInfo.packageName)
+                            // Usual Suspects section
+                            if (usualSuspects.isNotEmpty()) {
+                                item {
+                                    SectionHeader(
+                                        title = "THE USUAL SUSPECTS",
+                                        subtitle = "${usualSuspects.size} apps engineered for addiction"
+                                    )
+                                }
 
-                                UsageAppCard(
-                                    appInfo = appInfo,
-                                    packageManager = context.packageManager,
-                                    isSelected = isSelected,
-                                    onClick = {
-                                        viewModel.toggleAppSelection(appInfo.applicationInfo.packageName)
-                                    }
-                                )
+                                items(
+                                    items = usualSuspects,
+                                    key = { "suspect_${it.applicationInfo.packageName}" }
+                                ) { appInfo ->
+                                    val isSelected = selectedApps.contains(appInfo.applicationInfo.packageName)
+
+                                    UsageAppCard(
+                                        appInfo = appInfo,
+                                        packageManager = context.packageManager,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            viewModel.toggleAppSelection(appInfo.applicationInfo.packageName)
+                                        }
+                                    )
+                                }
+                            }
+
+                            // Other Apps section
+                            if (otherApps.isNotEmpty()) {
+                                item {
+                                    SectionHeader(
+                                        title = "OTHER APPS",
+                                        subtitle = "${otherApps.size} apps on your device"
+                                    )
+                                }
+
+                                items(
+                                    items = otherApps,
+                                    key = { "other_${it.applicationInfo.packageName}" }
+                                ) { appInfo ->
+                                    val isSelected = selectedApps.contains(appInfo.applicationInfo.packageName)
+
+                                    UsageAppCard(
+                                        appInfo = appInfo,
+                                        packageManager = context.packageManager,
+                                        isSelected = isSelected,
+                                        onClick = {
+                                            viewModel.toggleAppSelection(appInfo.applicationInfo.packageName)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -349,5 +393,32 @@ fun UsageAppCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+fun SectionHeader(
+    title: String,
+    subtitle: String
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+    ) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium.copy(
+                letterSpacing = 2.sp
+            ),
+            color = GoNullGreen,
+            fontWeight = FontWeight.Bold
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = GoNullGray
+        )
     }
 }

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gonull.data.local.entity.BlockedAppEntity
 import app.gonull.data.local.entity.UnlockRequestEntity
+import app.gonull.ui.components.DailyIntelCard
 import app.gonull.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,7 +27,8 @@ import app.gonull.ui.theme.*
 fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToAppSelection: () -> Unit,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToIntel: () -> Unit
 ) {
     val blockedApps by viewModel.blockedApps.collectAsState()
     val pendingUnlocks by viewModel.pendingUnlocks.collectAsState()
@@ -37,9 +39,8 @@ fun HomeScreen(
                 title = {
                     Text(
                         "GoNull",
-                        fontFamily = JetBrainsMono,
-                        color = GoNullGreen,
-                        fontWeight = FontWeight.Bold
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = GoNullGreen
                     )
                 },
                 actions = {
@@ -77,6 +78,11 @@ fun HomeScreen(
             // Stats summary
             item {
                 StatsCard(blockedToday = viewModel.blockedCountToday)
+            }
+
+            // Daily Intel
+            item {
+                DailyIntelCard(onSeeAll = onNavigateToIntel)
             }
 
             // Pending unlocks

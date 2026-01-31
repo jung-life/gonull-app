@@ -1,14 +1,15 @@
 package app.gonull.ui.screens.usageinsights
 
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.gonull.data.AppDataCache
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.BlockedAppEntity
+import app.gonull.service.AppBlockerService
 import app.gonull.util.PermissionHelper
 import app.gonull.util.PreferenceHelper
 import kotlinx.coroutines.Dispatchers
@@ -17,12 +18,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.*
 
 data class AppInfo(
     val applicationInfo: ApplicationInfo,
     val totalTimeInForeground: Long,
-    val usagePercentage: Float // Relative to the most used app
+    val usagePercentage: Float, // Relative to the most used app
+    val isUsualSuspect: Boolean = false
 )
 
 class UsageInsightsViewModel(
@@ -41,76 +42,69 @@ class UsageInsightsViewModel(
     private val _hasUsagePermission = MutableStateFlow(false)
     val hasUsagePermission: StateFlow<Boolean> = _hasUsagePermission.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
     /**
-     * Load all installed apps with usage statistics for the last 7 days.
-     * Apps are sorted by usage time in descending order (most used first).
+     * Update the search query for filtering apps.
+     */
+    fun updateSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    /**
+     * Load all installed apps with usage statistics.
+     * Uses cached data from AppDataCache if available, otherwise loads fresh.
      */
     fun loadApps(context: Context) {
-        Log.d("UsageInsights", "loadApps called")
-        val hasPermission = PermissionHelper.hasUsageStatsPermission(context)
-        _hasUsagePermission.value = hasPermission
-        Log.d("UsageInsights", "Has usage permission: $hasPermission")
+        Log.d("UsageInsights", "========== loadApps called ==========")
+
+        // Check permission directly - this is the authoritative source
+        _hasUsagePermission.value = PermissionHelper.hasUsageStatsPermission(context)
+        Log.d("UsageInsights", "Has usage permission: ${_hasUsagePermission.value}")
 
         viewModelScope.launch {
             _isLoading.value = true
 
-            val packageManager = context.packageManager
-
-            // Get all user-installed apps and system apps with launchers
-            val allApps = withContext(Dispatchers.IO) {
-                val apps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-                    .filter { app ->
-                        val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
-                        val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
-                        isUserApp || hasLauncher
-                    }
-                Log.d("UsageInsights", "Found ${apps.size} apps")
-                apps
+            // Check if cache is already loaded
+            if (AppDataCache.isLoaded.value) {
+                Log.d("UsageInsights", "Using cached app data")
+                loadFromCache()
+            } else {
+                Log.d("UsageInsights", "Cache not ready, triggering preload...")
+                // Trigger preload and wait for it
+                AppDataCache.preload(context)
+                loadFromCache()
             }
 
-            // Build usage statistics map
-            var mostUsedTime = 1L
-            val usageMap = mutableMapOf<String, Pair<Long, Float>>()
-
-            if (hasPermission) {
-                val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-                val calendar = Calendar.getInstance()
-                calendar.add(Calendar.DAY_OF_YEAR, -7) // Last 7 days
-
-                val stats = usageStatsManager.queryAndAggregateUsageStats(
-                    calendar.timeInMillis,
-                    System.currentTimeMillis()
-                )
-
-                // Find the most used app time
-                stats.forEach { (_, stat) ->
-                    val time = stat.totalTimeInForeground
-                    if (time > mostUsedTime) mostUsedTime = time
-                }
-
-                // Calculate usage percentages
-                stats.forEach { (pkg, stat) ->
-                    val time = stat.totalTimeInForeground
-                    val percentage = time.toFloat() / mostUsedTime
-                    usageMap[pkg] = Pair(time, percentage)
-                }
-            }
-
-            // Create AppInfo objects and sort by usage time (descending)
-            val appInfoList = allApps.map { app ->
-                val (time, percentage) = usageMap[app.packageName] ?: Pair(0L, 0f)
-
-                AppInfo(
-                    applicationInfo = app,
-                    totalTimeInForeground = time,
-                    usagePercentage = percentage
-                )
-            }.sortedByDescending { it.totalTimeInForeground }
-
-            Log.d("UsageInsights", "Setting ${appInfoList.size} apps to state")
-            _apps.value = appInfoList
             _isLoading.value = false
-            Log.d("UsageInsights", "Loading complete. isLoading=false, apps size=${_apps.value.size}")
+        }
+    }
+
+    private fun loadFromCache() {
+        val cachedApps = AppDataCache.apps.value
+
+        // Convert CachedAppInfo to AppInfo
+        val appInfoList = cachedApps.map { cached ->
+            AppInfo(
+                applicationInfo = cached.applicationInfo,
+                totalTimeInForeground = cached.totalTimeInForeground,
+                usagePercentage = cached.usagePercentage,
+                isUsualSuspect = cached.isUsualSuspect
+            )
+        }
+
+        _apps.value = appInfoList
+        Log.d("UsageInsights", "Loaded ${appInfoList.size} apps from cache")
+
+        // Auto-select usual suspects by default (only if nothing selected yet)
+        if (_selectedApps.value.isEmpty()) {
+            val usualSuspectPackages = appInfoList
+                .filter { it.isUsualSuspect }
+                .map { it.applicationInfo.packageName }
+                .toSet()
+            _selectedApps.value = usualSuspectPackages
+            Log.d("UsageInsights", "Auto-selected ${usualSuspectPackages.size} usual suspects")
         }
     }
 
@@ -150,6 +144,9 @@ class UsageInsightsViewModel(
                 // Mark initial setup as complete
                 PreferenceHelper.setInitialSetupComplete(context)
             }
+
+            // Immediately invalidate the AppBlockerService cache so blocking takes effect right away
+            AppBlockerService.invalidateCache(context)
 
             // Trigger navigation to Home screen
             withContext(Dispatchers.Main) {

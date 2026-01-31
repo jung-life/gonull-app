@@ -9,6 +9,9 @@ interface BlockedAppDao {
     @Query("SELECT * FROM blocked_apps WHERE isActive = 1")
     fun getActiveBlockedApps(): Flow<List<BlockedAppEntity>>
 
+    @Query("SELECT * FROM blocked_apps WHERE isActive = 1")
+    suspend fun getActiveBlockedAppsSync(): List<BlockedAppEntity>
+
     @Query("SELECT * FROM blocked_apps WHERE packageName = :packageName")
     suspend fun getBlockedApp(packageName: String): BlockedAppEntity?
 
@@ -20,6 +23,9 @@ interface BlockedAppDao {
 
     @Delete
     suspend fun deleteBlockedApp(app: BlockedAppEntity)
+
+    @Query("DELETE FROM blocked_apps WHERE packageName = :packageName")
+    suspend fun deleteBlockedAppByPackage(packageName: String)
 
     @Query("UPDATE blocked_apps SET isActive = :isActive WHERE packageName = :packageName")
     suspend fun setAppActive(packageName: String, isActive: Boolean)

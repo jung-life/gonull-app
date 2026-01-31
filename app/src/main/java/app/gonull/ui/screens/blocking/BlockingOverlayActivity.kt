@@ -289,7 +289,13 @@ fun BunkerModeDialog(
                             value = inputCode,
                             onValueChange = { inputCode = it },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = GoNullWhite, unfocusedTextColor = GoNullWhite)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = GoNullWhite,
+                                unfocusedTextColor = GoNullWhite,
+                                cursorColor = GoNullYellow,
+                                focusedBorderColor = GoNullYellow,
+                                unfocusedBorderColor = GoNullGray
+                            )
                         )
                     }
                     1 -> {
@@ -300,7 +306,13 @@ fun BunkerModeDialog(
                             value = mathAnswer,
                             onValueChange = { mathAnswer = it },
                             modifier = Modifier.fillMaxWidth(),
-                            colors = OutlinedTextFieldDefaults.colors(focusedTextColor = GoNullWhite, unfocusedTextColor = GoNullWhite)
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = GoNullWhite,
+                                unfocusedTextColor = GoNullWhite,
+                                cursorColor = GoNullYellow,
+                                focusedBorderColor = GoNullYellow,
+                                unfocusedBorderColor = GoNullGray
+                            )
                         )
                     }
                 }

@@ -28,18 +28,14 @@ fun OnboardingScreen(
 
     var accessibilityEnabled by remember { mutableStateOf(false) }
     var overlayEnabled by remember { mutableStateOf(false) }
+    var usageStatsEnabled by remember { mutableStateOf(false) }
 
     // Check permissions periodically
     LaunchedEffect(Unit) {
         while (true) {
             accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
             overlayEnabled = PermissionHelper.canDrawOverlays(context)
-
-            if (accessibilityEnabled && overlayEnabled) {
-                onComplete()
-                break
-            }
-
+            usageStatsEnabled = PermissionHelper.hasUsageStatsPermission(context)
             kotlinx.coroutines.delay(1000)
         }
     }
@@ -50,7 +46,9 @@ fun OnboardingScreen(
         2 -> PermissionsPage(
             accessibilityEnabled = accessibilityEnabled,
             overlayEnabled = overlayEnabled,
-            onBack = { currentPage = 1 }
+            usageStatsEnabled = usageStatsEnabled,
+            onBack = { currentPage = 1 },
+            onContinue = onComplete
         )
     }
 }
@@ -62,48 +60,121 @@ fun WelcomePage(onNext: () -> Unit) {
             .fillMaxSize()
             .background(GoNullBlack)
             .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Logo
+        Spacer(modifier = Modifier.height(48.dp))
+
+        // Header
         Text(
-            text = "Ø",
-            style = MaterialTheme.typography.headlineLarge.copy(
-                fontSize = 96.sp,
-                color = GoNullGreen
-            )
+            text = "IN THE BUNKER",
+            style = MaterialTheme.typography.labelLarge.copy(
+                letterSpacing = 4.sp
+            ),
+            color = GoNullGreen,
+            fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "GoNull",
-            style = MaterialTheme.typography.headlineLarge,
+            text = "BREAK THE LOOP",
+            style = MaterialTheme.typography.headlineLarge.copy(
+                fontSize = 32.sp
+            ),
             color = GoNullWhite,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Text(
-            text = "Break free from digital addiction",
-            style = MaterialTheme.typography.bodyLarge,
-            color = GoNullGray,
-            textAlign = TextAlign.Center
-        )
-
         Spacer(modifier = Modifier.height(48.dp))
 
-        Text(
-            text = "Unlike other app blockers that rely on willpower, GoNull creates meaningful friction through commitment contracts.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = GoNullGray,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(horizontal = 16.dp)
-        )
+        // Main content - scrollable
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
+        ) {
+            // The Problem
+            Text(
+                text = "THE PROBLEM",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    letterSpacing = 2.sp
+                ),
+                color = GoNullGreen,
+                fontWeight = FontWeight.Bold
+            )
 
-        Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
+            Text(
+                text = "You tell yourself \"just 5 minutes.\" Two hours later, you're still scrolling. You feel drained. You hate yourself for wasting time.",
+                style = MaterialTheme.typography.bodyLarge,
+                color = GoNullWhite,
+                lineHeight = 26.sp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // The Science
+            Text(
+                text = "THE SCIENCE",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    letterSpacing = 2.sp
+                ),
+                color = GoNullGreen,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "These apps use variable reward schedules—the same psychology as slot machines. Your rational brain needs 20+ seconds to override impulse. By then, you've already unlocked your phone.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GoNullGray,
+                lineHeight = 24.sp
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // The Truth
+            Text(
+                text = "THE TRUTH",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    letterSpacing = 2.sp
+                ),
+                color = GoNullGreen,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Text(
+                text = "Willpower is bringing a knife to a gunfight. You can't out-discipline a system built by teams of engineers whose job is to keep you engaged. You need external barriers, not internal strength.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GoNullGray,
+                lineHeight = 24.sp
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Divider line
+            Divider(color = GoNullBorder, thickness = 1.dp)
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // The Solution
+            Text(
+                text = "That's not weakness. That's strategy.",
+                style = MaterialTheme.typography.titleLarge,
+                color = GoNullWhite,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+        }
+
+        // CTA Button
         Button(
             onClick = onNext,
             colors = ButtonDefaults.buttonColors(
@@ -112,8 +183,10 @@ fun WelcomePage(onNext: () -> Unit) {
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Get Started", fontWeight = FontWeight.Bold)
+            Text("Enter the Bunker", fontWeight = FontWeight.Bold)
         }
+
+        Spacer(modifier = Modifier.height(16.dp))
     }
 }
 
@@ -124,12 +197,23 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             .fillMaxSize()
             .background(GoNullBlack)
             .padding(24.dp)
-            .verticalScroll(rememberScrollState())
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Header
         Text(
-            text = "How GoNull Works",
+            text = "THE PROTOCOL",
+            style = MaterialTheme.typography.labelLarge.copy(
+                letterSpacing = 4.sp
+            ),
+            color = GoNullGreen,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "How Recovery Works",
             style = MaterialTheme.typography.headlineMedium,
             color = GoNullWhite,
             fontWeight = FontWeight.Bold
@@ -137,131 +221,71 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Accessibility Service Disclosure
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = GoNullSurface
-            ),
-            modifier = Modifier.fillMaxWidth()
+        // Scrollable content
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .verticalScroll(rememberScrollState())
         ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "⚡ Accessibility Service",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = GoNullGreen,
-                    fontWeight = FontWeight.Bold
-                )
+            // The 20-Second Rule
+            ProtocolCard(
+                number = "01",
+                title = "The 20-Second Rule",
+                description = "Your impulse brain fires instantly. Your rational brain takes 20+ seconds to engage. Soft blockers fail because you bypass them in under 10 seconds. Hard friction gives your thinking brain time to catch up."
+            )
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "GoNull uses Android's Accessibility Service to help users with:",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GoNullWhite
-                )
+            // Dopamine Deficit
+            ProtocolCard(
+                number = "02",
+                title = "The Deficit State",
+                description = "After hours of scrolling, you feel worse than when you started. Your brain downregulated dopamine receptors to handle the flood. Now you need MORE stimulation just to feel normal. The only way out is to let your brain recalibrate."
+            )
 
-                Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                BulletPoint("ADHD and executive function challenges")
-                BulletPoint("Digital addiction and impulse control disorders")
-                BulletPoint("Building healthier screen time habits")
+            // 30-Day Reset
+            ProtocolCard(
+                number = "03",
+                title = "The 30-Day Reset",
+                description = "Research shows it takes about 30 days for dopamine receptors to reset. Days 1-10: withdrawal and fog. Days 11-20: clarity returns. Days 21-30: new habits solidify. If you slip, you don't lose progress—the pathway pauses, not dies."
+            )
 
-                Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-                Divider(color = GoNullBorder)
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "What we detect:",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = GoNullWhite,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                BulletPoint("When you open an app you've chosen to block")
-                BulletPoint("The package name of the app (e.g., \"com.instagram.android\")")
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "What we DON'T collect:",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = GoNullWhite,
-                    fontWeight = FontWeight.SemiBold
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                BulletPoint("Your screen content")
-                BulletPoint("Your passwords or personal data")
-                BulletPoint("Your browsing history")
-                BulletPoint("Any data sent to external servers")
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = GoNullGreen.copy(alpha = 0.1f)
+            // Privacy Note
+            Card(
+                colors = CardDefaults.cardColors(
+                    containerColor = GoNullSurface
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(
+                        text = "PRIVACY",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            letterSpacing = 2.sp
+                        ),
+                        color = GoNullGreen,
+                        fontWeight = FontWeight.Bold
                     )
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(
-                            text = "🔒 Privacy Guarantee",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = GoNullGreen,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "All detection happens locally on your device. No data is collected, stored on servers, or shared with third parties.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GoNullWhite
-                        )
-                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "GoNull detects when you open blocked apps—nothing else. No screen content, no passwords, no data sent anywhere. Everything stays on your device.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GoNullGray,
+                        lineHeight = 20.sp
+                    )
                 }
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Why this helps section
-        Card(
-            colors = CardDefaults.cardColors(
-                containerColor = GoNullSurface
-            ),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    text = "🧠 Designed for Neurodivergent Users",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = GoNullWhite,
-                    fontWeight = FontWeight.Bold
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "For users with ADHD, autism, or impulse control challenges, simply \"deciding\" to avoid apps doesn't work. GoNull creates external structure that supports self-regulation.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GoNullGray
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Text(
-                    text = "By detecting app launches and creating friction (time delays, accountability), GoNull acts as a \"pause button\" for your brain.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GoNullGray
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(32.dp))
-
+        // CTA Button
         Button(
             onClick = onNext,
             colors = ButtonDefaults.buttonColors(
@@ -270,10 +294,55 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("I Understand - Continue", fontWeight = FontWeight.Bold)
+            Text("Set Up Permissions", fontWeight = FontWeight.Bold)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
+    }
+}
+
+@Composable
+fun ProtocolCard(
+    number: String,
+    title: String,
+    description: String
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = GoNullSurface
+        ),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            // Number badge
+            Text(
+                text = number,
+                style = MaterialTheme.typography.headlineMedium,
+                color = GoNullGreen.copy(alpha = 0.3f),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = GoNullWhite,
+                    fontWeight = FontWeight.Bold
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GoNullGray,
+                    lineHeight = 20.sp
+                )
+            }
+        }
     }
 }
 
@@ -298,33 +367,46 @@ fun BulletPoint(text: String) {
 fun PermissionsPage(
     accessibilityEnabled: Boolean,
     overlayEnabled: Boolean,
-    onBack: () -> Unit
+    usageStatsEnabled: Boolean,
+    onBack: () -> Unit,
+    onContinue: () -> Unit
 ) {
     val context = LocalContext.current
+    val allRequiredGranted = accessibilityEnabled && overlayEnabled && usageStatsEnabled
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .background(GoNullBlack)
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(24.dp)
     ) {
         Spacer(modifier = Modifier.height(32.dp))
 
+        // Header
         Text(
-            text = "Grant Permissions",
+            text = "SETUP",
+            style = MaterialTheme.typography.labelLarge.copy(
+                letterSpacing = 4.sp
+            ),
+            color = GoNullGreen,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Grant Access",
             style = MaterialTheme.typography.headlineMedium,
             color = GoNullWhite,
             fontWeight = FontWeight.Bold
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Tap each permission below to enable",
-            style = MaterialTheme.typography.bodyLarge,
-            color = GoNullGray,
-            textAlign = TextAlign.Center
+            text = "Tap each permission to enable",
+            style = MaterialTheme.typography.bodyMedium,
+            color = GoNullGray
         )
 
         Spacer(modifier = Modifier.height(24.dp))
@@ -337,28 +419,38 @@ fun PermissionsPage(
         ) {
             PermissionCard(
                 title = "Accessibility Service",
-                description = "Required to detect when blocked apps open",
+                description = "Detects when you open blocked apps",
                 requirement = "REQUIRED",
                 isGranted = accessibilityEnabled,
                 onClick = { PermissionHelper.openAccessibilitySettings(context) }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
             PermissionCard(
-                title = "Display Over Other Apps",
-                description = "Required to show the blocking screen",
+                title = "Display Over Apps",
+                description = "Shows the blocking screen",
                 requirement = "REQUIRED",
                 isGranted = overlayEnabled,
                 onClick = { PermissionHelper.openOverlaySettings(context) }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PermissionCard(
+                title = "Usage Stats",
+                description = "Shows your app usage data",
+                requirement = "REQUIRED",
+                isGranted = usageStatsEnabled,
+                onClick = { PermissionHelper.openUsageStatsSettings(context) }
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
 
             PermissionCard(
                 title = "Developer Settings",
-                description = "On some devices, you may need to enable 'Allow screen overlays' in Developer Settings for the blocking screen to work properly",
-                requirement = "IF NEEDED",
+                description = "Some devices need this for overlays to work",
+                requirement = "OPTIONAL",
                 isGranted = false,
                 onClick = { PermissionHelper.openDeveloperSettings(context) }
             )
@@ -366,35 +458,31 @@ fun PermissionsPage(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        if (accessibilityEnabled && overlayEnabled) {
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = GoNullGreen.copy(alpha = 0.1f)
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = null,
-                        tint = GoNullGreen
-                    )
-                    Spacer(modifier = Modifier.width(12.dp))
-                    Text(
-                        "All permissions granted! Starting GoNull...",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = GoNullWhite
-                    )
-                }
-            }
-            Spacer(modifier = Modifier.height(16.dp))
+        // Continue button
+        Button(
+            onClick = onContinue,
+            enabled = allRequiredGranted,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GoNullGreen,
+                contentColor = GoNullBlack,
+                disabledContainerColor = GoNullSurface,
+                disabledContentColor = GoNullGray
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                if (allRequiredGranted) "Continue" else "Grant all permissions to continue",
+                fontWeight = FontWeight.Bold
+            )
         }
 
-        TextButton(onClick = onBack) {
-            Text("← Back", color = GoNullGray)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        TextButton(
+            onClick = onBack,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Back", color = GoNullGray)
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -410,6 +498,13 @@ fun PermissionCard(
     isGranted: Boolean,
     onClick: () -> Unit
 ) {
+    val isRequired = requirement == "REQUIRED"
+    val badgeColor = when {
+        isGranted -> GoNullGreen
+        isRequired -> GoNullYellow
+        else -> GoNullGray
+    }
+
     Card(
         onClick = onClick,
         colors = CardDefaults.cardColors(
@@ -420,46 +515,48 @@ fun PermissionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.Top
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    color = GoNullWhite,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (requirement == "REQUIRED") GoNullRed.copy(alpha = 0.2f) else GoNullYellow.copy(alpha = 0.2f)
-                    )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = requirement,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (requirement == "REQUIRED") GoNullRed else GoNullYellow,
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        fontWeight = FontWeight.Bold
+                        text = title,
+                        style = MaterialTheme.typography.titleSmall,
+                        color = if (isGranted) GoNullGreen else GoNullWhite,
+                        fontWeight = FontWeight.SemiBold
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Surface(
+                        color = badgeColor.copy(alpha = 0.2f),
+                        shape = MaterialTheme.shapes.small
+                    ) {
+                        Text(
+                            text = if (isGranted) "DONE" else requirement,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = badgeColor,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = description,
                     style = MaterialTheme.typography.bodySmall,
-                    color = GoNullGray,
-                    lineHeight = 18.sp
+                    color = GoNullGray
                 )
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
             Icon(
                 imageVector = if (isGranted) Icons.Default.Check else Icons.Default.Close,
                 contentDescription = if (isGranted) "Granted" else "Not granted",
-                tint = if (isGranted) GoNullGreen else GoNullRed,
-                modifier = Modifier.size(32.dp)
+                tint = if (isGranted) GoNullGreen else if (isRequired) GoNullYellow else GoNullGray,
+                modifier = Modifier.size(24.dp)
             )
         }
     }

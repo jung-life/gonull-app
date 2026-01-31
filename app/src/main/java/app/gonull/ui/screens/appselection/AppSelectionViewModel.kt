@@ -1,13 +1,15 @@
 package app.gonull.ui.screens.appselection
 
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import app.gonull.data.AppDataCache
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.BlockedAppEntity
+import app.gonull.service.AppBlockerService
 import app.gonull.util.PermissionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,7 +17,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.util.*
 
 data class AppCategory(
     val name: String,
@@ -50,90 +51,111 @@ class AppSelectionViewModel(
     private val _hasUsagePermission = MutableStateFlow(false)
     val hasUsagePermission: StateFlow<Boolean> = _hasUsagePermission.asStateFlow()
 
+    private val _isSaving = MutableStateFlow(false)
+    val isSaving: StateFlow<Boolean> = _isSaving.asStateFlow()
+
+    // Track existing blocked apps to avoid re-selecting defaults
+    private var existingBlockedApps: Set<String> = emptySet()
+
     fun loadApps(context: Context) {
-        val hasPermission = PermissionHelper.hasUsageStatsPermission(context)
-        _hasUsagePermission.value = hasPermission
+        Log.d("AppSelection", "loadApps called")
+
+        // Check permission directly - this is the authoritative source
+        _hasUsagePermission.value = PermissionHelper.hasUsageStatsPermission(context)
+        Log.d("AppSelection", "Has usage permission: ${_hasUsagePermission.value}")
 
         viewModelScope.launch {
-            val packageManager = context.packageManager
-            
-            val allApps = withContext(Dispatchers.IO) {
-                packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-                    .filter { app ->
-                        val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
-                        val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
-                        isUserApp || hasLauncher
-                    }
+            // Load existing blocked apps from database
+            val blockedApps = withContext(Dispatchers.IO) {
+                database.blockedAppDao().getActiveBlockedAppsSync()
             }
+            existingBlockedApps = blockedApps.map { it.packageName }.toSet()
 
-            var mostUsedTime = 1L
-            val usageMap = mutableMapOf<String, AppUsageInfo>()
-
-            if (hasPermission) {
-                val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-                val calendar = Calendar.getInstance()
-                calendar.add(Calendar.DAY_OF_YEAR, -7)
-                
-                val stats = usageStatsManager.queryAndAggregateUsageStats(
-                    calendar.timeInMillis,
-                    System.currentTimeMillis()
-                )
-
-                stats.forEach { (pkg, stat) ->
-                    val time = stat.totalTimeInForeground
-                    if (time > mostUsedTime) mostUsedTime = time
-                }
-
-                stats.forEach { (pkg, stat) ->
-                    val time = stat.totalTimeInForeground
-                    usageMap[pkg] = AppUsageInfo(
-                        packageName = pkg,
-                        totalTimeInForeground = time,
-                        usagePercentage = time.toFloat() / mostUsedTime
-                    )
-                }
-            }
-            
-            _usageInfoMap.value = usageMap
-
-            val sortedByUsage = allApps.sortedByDescending { usageMap[it.packageName]?.totalTimeInForeground ?: 0L }
-            
-            val mostUsed = if (hasPermission) sortedByUsage.take(10).filter { (usageMap[it.packageName]?.totalTimeInForeground ?: 0L) > 0 } else emptyList()
-            
-            val socialApps = mutableListOf<ApplicationInfo>()
-            val entertainmentApps = mutableListOf<ApplicationInfo>()
-            val productivityApps = mutableListOf<ApplicationInfo>()
-            val otherApps = mutableListOf<ApplicationInfo>()
-
-            val socialKeywords = listOf("facebook", "instagram", "twitter", "x.android", "tiktok", "snapchat", "linkedin", "reddit", "whatsapp", "telegram", "messenger")
-            val entertainmentKeywords = listOf("youtube", "netflix", "disney", "spotify", "twitch", "prime.video", "hulu")
-            val productivityKeywords = listOf("email", "calendar", "slack", "zoom", "teams", "notion", "todoist", "keep")
-
-            allApps.forEach { app ->
-                val pkg = app.packageName.lowercase()
-                when {
-                    socialKeywords.any { pkg.contains(it) } -> socialApps.add(app)
-                    entertainmentKeywords.any { pkg.contains(it) } -> entertainmentApps.add(app)
-                    productivityKeywords.any { pkg.contains(it) } -> productivityApps.add(app)
-                    else -> otherApps.add(app)
-                }
-            }
-
-            val categories = mutableListOf<AppCategory>()
-            if (mostUsed.isNotEmpty()) categories.add(AppCategory("Top Used This Week (Realization Time)", mostUsed))
-            if (socialApps.isNotEmpty()) categories.add(AppCategory("Social & Communication", socialApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-            if (entertainmentApps.isNotEmpty()) categories.add(AppCategory("Entertainment", entertainmentApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-            if (productivityApps.isNotEmpty()) categories.add(AppCategory("Productivity", productivityApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-            if (otherApps.isNotEmpty()) categories.add(AppCategory("All Other Apps", otherApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-
-            _categorizedApps.value = categories
-            
+            // Pre-select already blocked apps
             if (!_isLoaded.value) {
-                val recommended = (socialApps + entertainmentApps).map { it.packageName }.toSet()
-                _selectedApps.value = recommended
+                _selectedApps.value = existingBlockedApps
             }
-            
+
+            // Check if cache is ready
+            if (AppDataCache.isLoaded.value) {
+                Log.d("AppSelection", "Using cached app data")
+                loadFromCache(context)
+            } else {
+                Log.d("AppSelection", "Cache not ready, triggering preload...")
+                AppDataCache.preload(context)
+                loadFromCache(context)
+            }
+
             _isLoaded.value = true
+        }
+    }
+
+    private fun loadFromCache(context: Context) {
+        val packageManager = context.packageManager
+
+        val cachedApps = AppDataCache.apps.value
+        val usualSuspectsCached = AppDataCache.usualSuspects.value
+        val otherAppsCached = AppDataCache.otherApps.value
+
+        // Build usage info map from cache
+        val usageMap = cachedApps.associate { cached ->
+            cached.packageName to AppUsageInfo(
+                packageName = cached.packageName,
+                totalTimeInForeground = cached.totalTimeInForeground,
+                usagePercentage = cached.usagePercentage
+            )
+        }
+        _usageInfoMap.value = usageMap
+
+        // Get ApplicationInfo lists
+        val usualSuspects = usualSuspectsCached.map { it.applicationInfo }
+        val usualSuspectsPackages = usualSuspects.map { it.packageName }.toSet()
+
+        // Get top used (non-usual suspects with usage)
+        val mostUsed = if (_hasUsagePermission.value) {
+            otherAppsCached
+                .filter { it.totalTimeInForeground > 0 }
+                .take(10)
+                .map { it.applicationInfo }
+        } else emptyList()
+
+        // Categorize remaining apps
+        val socialApps = mutableListOf<ApplicationInfo>()
+        val entertainmentApps = mutableListOf<ApplicationInfo>()
+        val productivityApps = mutableListOf<ApplicationInfo>()
+        val otherApps = mutableListOf<ApplicationInfo>()
+
+        val socialKeywords = listOf("facebook", "instagram", "twitter", "x.android", "tiktok", "snapchat", "linkedin", "reddit", "whatsapp", "telegram", "messenger")
+        val entertainmentKeywords = listOf("youtube", "netflix", "disney", "spotify", "twitch", "prime.video", "hulu")
+        val productivityKeywords = listOf("email", "calendar", "slack", "zoom", "teams", "notion", "todoist", "keep")
+
+        otherAppsCached.forEach { cached ->
+            val pkg = cached.packageName.lowercase()
+            val app = cached.applicationInfo
+            when {
+                socialKeywords.any { pkg.contains(it) } -> socialApps.add(app)
+                entertainmentKeywords.any { pkg.contains(it) } -> entertainmentApps.add(app)
+                productivityKeywords.any { pkg.contains(it) } -> productivityApps.add(app)
+                else -> otherApps.add(app)
+            }
+        }
+
+        // Build categories
+        val categories = mutableListOf<AppCategory>()
+        if (usualSuspects.isNotEmpty()) categories.add(AppCategory("The Usual Suspects", usualSuspects))
+        if (mostUsed.isNotEmpty()) categories.add(AppCategory("Your Top Used This Week", mostUsed))
+        if (socialApps.isNotEmpty()) categories.add(AppCategory("Social & Communication", socialApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+        if (entertainmentApps.isNotEmpty()) categories.add(AppCategory("Entertainment", entertainmentApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+        if (productivityApps.isNotEmpty()) categories.add(AppCategory("Productivity", productivityApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+        if (otherApps.isNotEmpty()) categories.add(AppCategory("All Other Apps", otherApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+
+        _categorizedApps.value = categories
+        Log.d("AppSelection", "Loaded ${categories.size} categories from cache")
+
+        // Only auto-select usual suspects if first load AND user has no existing blocked apps
+        if (!_isLoaded.value && existingBlockedApps.isEmpty()) {
+            _selectedApps.value = usualSuspectsPackages
+            Log.d("AppSelection", "Auto-selected ${usualSuspectsPackages.size} usual suspects")
         }
     }
 
@@ -149,21 +171,45 @@ class AppSelectionViewModel(
         }
     }
 
-    fun saveSelectedApps(packageManager: PackageManager) {
-        viewModelScope.launch {
-            _selectedApps.value.forEach { packageName ->
-                val categories = _categorizedApps.value
-                val appInfo = categories.flatMap { it.apps }.find { it.packageName == packageName }
-                if (appInfo != null) {
-                    val appName = appInfo.loadLabel(packageManager).toString()
+    fun saveSelectedApps(context: Context, packageManager: PackageManager, onComplete: () -> Unit) {
+        if (_isSaving.value) return // Prevent double-save
 
-                    database.blockedAppDao().insertBlockedApp(
-                        BlockedAppEntity(
-                            packageName = packageName,
-                            appName = appName
-                        )
-                    )
+        _isSaving.value = true
+        viewModelScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    // First, remove apps that were unselected (in existingBlockedApps but not in selectedApps)
+                    val appsToRemove = existingBlockedApps - _selectedApps.value
+                    appsToRemove.forEach { packageName ->
+                        database.blockedAppDao().deleteBlockedAppByPackage(packageName)
+                    }
+
+                    // Then, add newly selected apps
+                    _selectedApps.value.forEach { packageName ->
+                        val categories = _categorizedApps.value
+                        val appInfo = categories.flatMap { it.apps }.find { it.packageName == packageName }
+                        if (appInfo != null) {
+                            val appName = appInfo.loadLabel(packageManager).toString()
+
+                            database.blockedAppDao().insertBlockedApp(
+                                BlockedAppEntity(
+                                    packageName = packageName,
+                                    appName = appName
+                                )
+                            )
+                        }
+                    }
                 }
+
+                // Immediately invalidate the AppBlockerService cache so blocking takes effect right away
+                AppBlockerService.invalidateCache(context)
+
+                // Navigate back on main thread after save completes
+                withContext(Dispatchers.Main) {
+                    onComplete()
+                }
+            } finally {
+                _isSaving.value = false
             }
         }
     }

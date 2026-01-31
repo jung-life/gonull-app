@@ -1,7 +1,12 @@
 package app.gonull.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.os.Build
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UsageLogEntity
@@ -23,9 +28,27 @@ class AppBlockerService : AccessibilityService() {
     private var lastCacheUpdate = 0L
     private val cacheTimeout = 60_000L // 1 minute
 
+    // Broadcast receiver for cache invalidation
+    private val cacheInvalidationReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "Received cache invalidation broadcast")
+            serviceScope.launch {
+                updateBlockedAppsCache()
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(applicationContext)
+
+        // Register broadcast receiver for cache invalidation
+        val filter = IntentFilter(ACTION_INVALIDATE_CACHE)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(cacheInvalidationReceiver, filter, RECEIVER_NOT_EXPORTED)
+        } else {
+            registerReceiver(cacheInvalidationReceiver, filter)
+        }
 
         // Initialize cache
         serviceScope.launch {
@@ -65,6 +88,7 @@ class AppBlockerService : AccessibilityService() {
             .map { it.packageName }
             .toSet()
         lastCacheUpdate = System.currentTimeMillis()
+        Log.d(TAG, "Cache updated with ${blockedAppsCache.size} blocked apps: $blockedAppsCache")
     }
 
     private suspend fun checkAndBlockApp(packageName: String) {
@@ -114,12 +138,31 @@ class AppBlockerService : AccessibilityService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        try {
+            unregisterReceiver(cacheInvalidationReceiver)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error unregistering receiver", e)
+        }
         serviceScope.cancel()
     }
 
     companion object {
+        private const val TAG = "AppBlockerService"
+        const val ACTION_INVALIDATE_CACHE = "app.gonull.ACTION_INVALIDATE_BLOCKED_APPS_CACHE"
+
         var isRunning = false
             private set
+
+        /**
+         * Call this method after blocking/unblocking apps to immediately update the service cache.
+         * This ensures newly blocked apps are blocked right away without waiting for cache timeout.
+         */
+        fun invalidateCache(context: Context) {
+            Log.d(TAG, "Sending cache invalidation broadcast")
+            val intent = Intent(ACTION_INVALIDATE_CACHE)
+            intent.setPackage(context.packageName)
+            context.sendBroadcast(intent)
+        }
     }
 
     override fun onServiceConnected() {

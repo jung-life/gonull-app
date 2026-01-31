@@ -11,6 +11,7 @@ import app.gonull.ui.screens.appselection.AppSelectionViewModel
 import app.gonull.ui.screens.home.HomeScreen
 import app.gonull.ui.screens.home.HomeViewModel
 import app.gonull.ui.screens.onboarding.OnboardingScreen
+import app.gonull.ui.screens.intel.IntelScreen
 import app.gonull.ui.screens.settings.SettingsScreen
 import app.gonull.ui.screens.usageinsights.UsageInsightsScreen
 import app.gonull.ui.screens.usageinsights.UsageInsightsViewModel
@@ -22,6 +23,7 @@ sealed class Screen(val route: String) {
     object Home : Screen("home")
     object AppSelection : Screen("app_selection")
     object Settings : Screen("settings")
+    object Intel : Screen("intel")
 }
 
 @Composable
@@ -64,6 +66,17 @@ fun NavGraph(
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
+                },
+                onNavigateToIntel = {
+                    navController.navigate(Screen.Intel.route)
+                }
+            )
+        }
+
+        composable(Screen.Intel.route) {
+            IntelScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
                 }
             )
         }
