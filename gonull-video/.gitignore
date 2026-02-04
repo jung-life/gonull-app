@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+
+# Rendered output
+out/
+*.mp4
+*.mov
+*.webm
+*.avi
+
+# Build artifacts
+dist/
+.cache/
+
+# Environment
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/

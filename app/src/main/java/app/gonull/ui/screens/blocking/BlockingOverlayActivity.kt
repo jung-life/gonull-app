@@ -18,20 +18,36 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UnlockRequestEntity
+import app.gonull.service.AccessExpirationService
+import app.gonull.service.ProgressiveFrictionManager
 import app.gonull.service.UnlockTimerService
+import app.gonull.service.AccountabilityNotificationService
+import app.gonull.service.UsageBudgetManager
+import app.gonull.ui.components.CountdownTimer
+import app.gonull.ui.components.LockedUntilTomorrow
+import app.gonull.ui.components.ReflectionInput
+import app.gonull.ui.components.UsageMirrorCompact
+import app.gonull.ui.components.StreakBreakWarning
+import app.gonull.util.DateHelper
 import app.gonull.ui.theme.*
 import app.gonull.util.Constants
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class BlockingOverlayActivity : ComponentActivity() {
 
     private lateinit var database: AppDatabase
+    private lateinit var frictionManager: ProgressiveFrictionManager
+    private lateinit var budgetManager: UsageBudgetManager
+    private lateinit var notificationService: AccountabilityNotificationService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         database = AppDatabase.getDatabase(applicationContext)
+        frictionManager = ProgressiveFrictionManager.getInstance(applicationContext)
+        budgetManager = UsageBudgetManager.getInstance(applicationContext)
+        notificationService = AccountabilityNotificationService.getInstance(applicationContext)
+
         val packageName = intent.getStringExtra("PACKAGE_NAME") ?: run {
             finish()
             return
@@ -46,11 +62,48 @@ class BlockingOverlayActivity : ComponentActivity() {
 
         setContent {
             GoNullTheme {
+                var frictionLevel by remember { mutableIntStateOf(1) }
+                var isLocked by remember { mutableStateOf(false) }
+                var isBudgetExhausted by remember { mutableStateOf(false) }
+                var remainingBudget by remember { mutableStateOf<Int?>(null) }
+                var timeUntilReset by remember { mutableStateOf("") }
+                var todayUsageMinutes by remember { mutableIntStateOf(0) }
+                var weekUsageMinutes by remember { mutableIntStateOf(0) }
+                var currentStreak by remember { mutableIntStateOf(0) }
+
+                LaunchedEffect(packageName) {
+                    frictionLevel = frictionManager.getNextFrictionLevel(packageName)
+                    isLocked = frictionManager.isLockedForToday(packageName)
+                    timeUntilReset = frictionManager.getFormattedTimeUntilReset()
+                    isBudgetExhausted = budgetManager.isBudgetExhausted(packageName)
+                    remainingBudget = budgetManager.getRemainingBudgetMinutes(packageName)
+
+                    // Load usage stats
+                    val today = DateHelper.getTodayString()
+                    val weekAgo = DateHelper.getDateString(-7)
+                    todayUsageMinutes = database.dailyUsageDao().getUsedMinutes(packageName, today) ?: 0
+                    weekUsageMinutes = database.dailyUsageDao().getUsageForDateRange(packageName, weekAgo, today) ?: 0
+
+                    // Load streak
+                    val streak = database.streakDao().getStreak(packageName)
+                    currentStreak = streak?.currentStreak ?: 0
+                }
+
                 BlockingScreen(
                     appName = appName,
                     packageName = packageName,
+                    frictionLevel = frictionLevel,
+                    isLocked = isLocked,
+                    isBudgetExhausted = isBudgetExhausted,
+                    remainingBudget = remainingBudget,
+                    timeUntilReset = timeUntilReset,
+                    todayUsageMinutes = todayUsageMinutes,
+                    weekUsageMinutes = weekUsageMinutes,
+                    currentStreak = currentStreak,
                     onRequestUnlock = { requestUnlock(packageName) },
                     onEmergencyUnlock = { emergencyUnlock(packageName) },
+                    onBypassWithReflection = { reflection -> bypassWithReflection(packageName, reflection) },
+                    onBypassComplete = { recordBypassAndUnlock(packageName) },
                     onGoBack = { goHome() }
                 )
             }
@@ -76,6 +129,13 @@ class BlockingOverlayActivity : ComponentActivity() {
             )
 
             database.unlockRequestDao().insertRequest(request)
+
+            // Notify accountability partner
+            notificationService.notifyEmergencyBypass(packageName)
+
+            // Start expiration monitoring service
+            AccessExpirationService.start(applicationContext)
+
             goHome()
         }
     }
@@ -105,6 +165,56 @@ class BlockingOverlayActivity : ComponentActivity() {
         }
     }
 
+    private fun bypassWithReflection(packageName: String, reflection: String) {
+        val scope = lifecycleScope
+        scope.launch {
+            frictionManager.recordBypass(packageName, reflection)
+
+            val request = UnlockRequestEntity(
+                packageName = packageName,
+                requestedAt = System.currentTimeMillis(),
+                unlocksAt = System.currentTimeMillis(),
+                status = Constants.RequestStatus.UNLOCKED,
+                accessDurationMinutes = 15
+            )
+
+            database.unlockRequestDao().insertRequest(request)
+
+            // Check if this triggers multiple bypass notification
+            notificationService.checkAndNotifyMultipleBypasses(packageName)
+
+            // Start expiration monitoring service
+            AccessExpirationService.start(applicationContext)
+
+            goHome()
+        }
+    }
+
+    private fun recordBypassAndUnlock(packageName: String) {
+        val scope = lifecycleScope
+        scope.launch {
+            frictionManager.recordBypass(packageName)
+
+            val request = UnlockRequestEntity(
+                packageName = packageName,
+                requestedAt = System.currentTimeMillis(),
+                unlocksAt = System.currentTimeMillis(),
+                status = Constants.RequestStatus.UNLOCKED,
+                accessDurationMinutes = 15
+            )
+
+            database.unlockRequestDao().insertRequest(request)
+
+            // Check if this triggers multiple bypass notification
+            notificationService.checkAndNotifyMultipleBypasses(packageName)
+
+            // Start expiration monitoring service
+            AccessExpirationService.start(applicationContext)
+
+            goHome()
+        }
+    }
+
     private fun goHome() {
         val homeIntent = Intent(Intent.ACTION_MAIN).apply {
             addCategory(Intent.CATEGORY_HOME)
@@ -120,16 +230,42 @@ class BlockingOverlayActivity : ComponentActivity() {
     }
 }
 
+enum class BypassStep {
+    MAIN,
+    DELAY_VERIFICATION,
+    BUNKER_MODE,
+    WAIT_COUNTDOWN,
+    REFLECTION,
+    LOCKED
+}
+
 @Composable
 fun BlockingScreen(
     appName: String,
     packageName: String,
+    frictionLevel: Int,
+    isLocked: Boolean,
+    isBudgetExhausted: Boolean,
+    remainingBudget: Int?,
+    timeUntilReset: String,
+    todayUsageMinutes: Int,
+    weekUsageMinutes: Int,
+    currentStreak: Int,
     onRequestUnlock: () -> Unit,
     onEmergencyUnlock: () -> Unit,
+    onBypassWithReflection: (String) -> Unit,
+    onBypassComplete: () -> Unit,
     onGoBack: () -> Unit
 ) {
-    var showDelayDialog by remember { mutableStateOf(false) }
-    var showBunkerMode by remember { mutableStateOf(false) }
+    var currentStep by remember { mutableStateOf(BypassStep.MAIN) }
+    var pendingReflection by remember { mutableStateOf(false) }
+
+    // If locked or budget exhausted, show appropriate screen
+    LaunchedEffect(isLocked, isBudgetExhausted) {
+        if (isLocked) {
+            currentStep = BypassStep.LOCKED
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -137,90 +273,383 @@ fun BlockingScreen(
             .background(GoNullBlack),
         contentAlignment = Alignment.Center
     ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Text(
-                text = "Ø",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontSize = 72.sp,
-                    color = GoNullGreen
+        when {
+            isBudgetExhausted -> {
+                BudgetExhaustedScreen(
+                    appName = appName,
+                    onGoBack = onGoBack
                 )
+            }
+            currentStep == BypassStep.LOCKED -> {
+                LockedScreen(
+                    appName = appName,
+                    timeUntilReset = timeUntilReset,
+                    onGoBack = onGoBack
+                )
+            }
+            currentStep == BypassStep.WAIT_COUNTDOWN -> {
+                WaitCountdownScreen(
+                    frictionLevel = frictionLevel,
+                    onComplete = {
+                        if (frictionLevel == Constants.Friction.LEVEL_3_BYPASS) {
+                            currentStep = BypassStep.REFLECTION
+                        } else {
+                            onBypassComplete()
+                        }
+                    },
+                    onCancel = { currentStep = BypassStep.MAIN }
+                )
+            }
+            currentStep == BypassStep.REFLECTION -> {
+                ReflectionScreen(
+                    onSubmit = { reflection ->
+                        onBypassWithReflection(reflection)
+                    },
+                    onCancel = { currentStep = BypassStep.MAIN }
+                )
+            }
+            currentStep == BypassStep.DELAY_VERIFICATION -> {
+                DelayVerificationDialog(
+                    onDismiss = { currentStep = BypassStep.MAIN },
+                    onVerified = {
+                        currentStep = BypassStep.MAIN
+                        onRequestUnlock()
+                    }
+                )
+            }
+            currentStep == BypassStep.BUNKER_MODE -> {
+                BunkerModeDialog(
+                    frictionLevel = frictionLevel,
+                    onDismiss = { currentStep = BypassStep.MAIN },
+                    onVerified = {
+                        when (frictionLevel) {
+                            Constants.Friction.LEVEL_1_BYPASS -> onBypassComplete()
+                            Constants.Friction.LEVEL_2_BYPASS, Constants.Friction.LEVEL_3_BYPASS -> {
+                                currentStep = BypassStep.WAIT_COUNTDOWN
+                            }
+                            else -> currentStep = BypassStep.LOCKED
+                        }
+                    }
+                )
+            }
+            else -> {
+                MainBlockingScreen(
+                    appName = appName,
+                    frictionLevel = frictionLevel,
+                    remainingBudget = remainingBudget,
+                    todayUsageMinutes = todayUsageMinutes,
+                    weekUsageMinutes = weekUsageMinutes,
+                    currentStreak = currentStreak,
+                    onStartTimer = { currentStep = BypassStep.DELAY_VERIFICATION },
+                    onEmergencyAccess = { currentStep = BypassStep.BUNKER_MODE },
+                    onGoBack = onGoBack
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MainBlockingScreen(
+    appName: String,
+    frictionLevel: Int,
+    remainingBudget: Int?,
+    todayUsageMinutes: Int,
+    weekUsageMinutes: Int,
+    currentStreak: Int,
+    onStartTimer: () -> Unit,
+    onEmergencyAccess: () -> Unit,
+    onGoBack: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(32.dp)
+    ) {
+        Text(
+            text = "Ø",
+            style = MaterialTheme.typography.headlineLarge.copy(
+                fontSize = 72.sp,
+                color = GoNullGreen
             )
+        )
 
-            Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = appName,
-                style = MaterialTheme.typography.headlineMedium,
-                color = GoNullWhite,
-                textAlign = TextAlign.Center
+        Text(
+            text = appName,
+            style = MaterialTheme.typography.headlineMedium,
+            color = GoNullWhite,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Is this app serving your long-term goals?",
+            style = MaterialTheme.typography.bodyLarge,
+            color = GoNullGray,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Usage Mirror - shows time spent
+        UsageMirrorCompact(
+            todayMinutes = todayUsageMinutes,
+            weekMinutes = weekUsageMinutes,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        // Streak break warning (if user has a streak)
+        if (currentStreak > 0) {
+            Spacer(modifier = Modifier.height(12.dp))
+            StreakBreakWarning(
+                currentStreak = currentStreak,
+                modifier = Modifier.fillMaxWidth()
             )
+        }
 
+        // Show remaining budget if applicable
+        remainingBudget?.let { budget ->
             Spacer(modifier = Modifier.height(8.dp))
-
             Text(
-                text = "Is this app serving your long-term goals?",
-                style = MaterialTheme.typography.bodyLarge,
-                color = GoNullGray,
+                text = "Budget remaining: ${budget}min",
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (budget <= 5) GoNullRed else GoNullYellow,
                 textAlign = TextAlign.Center
             )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            Button(
-                onClick = { showDelayDialog = true },
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GoNullSurface,
-                    contentColor = GoNullWhite
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Start 30min Access Timer")
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            TextButton(onClick = { showBunkerMode = true }) {
-                Text(
-                    text = "Emergency Access (Bunker Mode)",
-                    color = GoNullRed
-                )
-            }
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = onGoBack,
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = GoNullGreen,
-                    contentColor = GoNullBlack
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Actually, I have things to do", fontWeight = FontWeight.Bold)
-            }
         }
 
-        if (showDelayDialog) {
-            DelayVerificationDialog(
-                onDismiss = { showDelayDialog = false },
-                onVerified = {
-                    showDelayDialog = false
-                    onRequestUnlock()
-                }
+        // Show friction level indicator
+        if (frictionLevel > 1) {
+            Spacer(modifier = Modifier.height(8.dp))
+            FrictionLevelIndicator(level = frictionLevel)
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        Button(
+            onClick = onStartTimer,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GoNullSurface,
+                contentColor = GoNullWhite
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Start 30min Access Timer")
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        TextButton(onClick = onEmergencyAccess) {
+            Text(
+                text = "Emergency Access (Bunker Mode)",
+                color = GoNullRed
             )
         }
 
-        if (showBunkerMode) {
-            BunkerModeDialog(
-                onDismiss = { showBunkerMode = false },
-                onUnlock = {
-                    showBunkerMode = false
-                    onEmergencyUnlock()
-                }
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Button(
+            onClick = onGoBack,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GoNullGreen,
+                contentColor = GoNullBlack
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Actually, I have things to do", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun FrictionLevelIndicator(level: Int) {
+    val description = when (level) {
+        2 -> "Bypass #2: 5 min wait required"
+        3 -> "Bypass #3: 15 min wait + reflection"
+        4 -> "Locked until tomorrow"
+        else -> ""
+    }
+
+    val color = when (level) {
+        2 -> GoNullYellow
+        3 -> GoNullRed.copy(alpha = 0.8f)
+        4 -> GoNullRed
+        else -> GoNullGray
+    }
+
+    Text(
+        text = description,
+        style = MaterialTheme.typography.bodySmall,
+        color = color,
+        textAlign = TextAlign.Center
+    )
+}
+
+@Composable
+fun WaitCountdownScreen(
+    frictionLevel: Int,
+    onComplete: () -> Unit,
+    onCancel: () -> Unit
+) {
+    val waitMinutes = when (frictionLevel) {
+        Constants.Friction.LEVEL_2_BYPASS -> Constants.Friction.LEVEL_2_WAIT_MINUTES
+        Constants.Friction.LEVEL_3_BYPASS -> Constants.Friction.LEVEL_3_WAIT_MINUTES
+        else -> 0
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "Mandatory Wait",
+            style = MaterialTheme.typography.headlineSmall,
+            color = GoNullYellow,
+            fontWeight = FontWeight.Bold
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "Bypass #$frictionLevel requires a $waitMinutes minute wait",
+            style = MaterialTheme.typography.bodyMedium,
+            color = GoNullGray,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        CountdownTimer(
+            totalSeconds = waitMinutes * 60,
+            onComplete = onComplete
+        )
+
+        Spacer(modifier = Modifier.height(32.dp))
+
+        OutlinedButton(
+            onClick = onCancel,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = GoNullGray
             )
+        ) {
+            Text("Cancel & Go Back")
+        }
+    }
+}
+
+@Composable
+fun ReflectionScreen(
+    onSubmit: (String) -> Unit,
+    onCancel: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        ReflectionInput(
+            onSubmit = onSubmit,
+            onCancel = onCancel
+        )
+    }
+}
+
+@Composable
+fun LockedScreen(
+    appName: String,
+    timeUntilReset: String,
+    onGoBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        LockedUntilTomorrow(timeUntilReset = timeUntilReset)
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        Button(
+            onClick = onGoBack,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GoNullGreen,
+                contentColor = GoNullBlack
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Do something else", fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+fun BudgetExhaustedScreen(
+    appName: String,
+    onGoBack: () -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        Text(
+            text = "BUDGET EXHAUSTED",
+            style = MaterialTheme.typography.headlineLarge.copy(
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold
+            ),
+            color = GoNullRed
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = appName,
+            style = MaterialTheme.typography.headlineSmall,
+            color = GoNullWhite,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Text(
+            text = "You've used all your daily time budget for this app.",
+            style = MaterialTheme.typography.bodyLarge,
+            color = GoNullGray,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = "No bypass options available.\nThis limit resets at midnight.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = GoNullGray,
+            textAlign = TextAlign.Center
+        )
+
+        Spacer(modifier = Modifier.height(48.dp))
+
+        Button(
+            onClick = onGoBack,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = GoNullGreen,
+                contentColor = GoNullBlack
+            ),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("Do something else", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -231,7 +660,7 @@ fun DelayVerificationDialog(
     onVerified: () -> Unit
 ) {
     var step by remember { mutableIntStateOf(0) }
-    
+
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GoNullSurface,
@@ -262,16 +691,22 @@ fun DelayVerificationDialog(
 
 @Composable
 fun BunkerModeDialog(
+    frictionLevel: Int,
     onDismiss: () -> Unit,
-    onUnlock: () -> Unit
+    onVerified: () -> Unit
 ) {
     var step by remember { mutableIntStateOf(0) }
     var inputCode by remember { mutableStateOf("") }
     val requiredCode = remember { (1000..9999).random().toString() }
-    
-    // Cognitive Friction Task
+
     var mathProblem by remember { mutableStateOf(generateMathProblem()) }
     var mathAnswer by remember { mutableStateOf("") }
+
+    val frictionDescription = when (frictionLevel) {
+        Constants.Friction.LEVEL_2_BYPASS -> "After verification, you'll need to wait 5 minutes."
+        Constants.Friction.LEVEL_3_BYPASS -> "After verification, you'll need to wait 15 minutes and write a reflection."
+        else -> ""
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -282,6 +717,10 @@ fun BunkerModeDialog(
                 when(step) {
                     0 -> {
                         Text("Bunker Mode bypasses the timer but requires high cognitive effort to prevent impulsive use.", color = GoNullGray)
+                        if (frictionDescription.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(frictionDescription, color = GoNullYellow, style = MaterialTheme.typography.bodySmall)
+                        }
                         Spacer(modifier = Modifier.height(16.dp))
                         Text("Type this random code to proceed:", color = GoNullWhite)
                         Text(requiredCode, style = MaterialTheme.typography.headlineMedium, color = GoNullYellow)
@@ -323,7 +762,7 @@ fun BunkerModeDialog(
                 if (step == 0 && inputCode == requiredCode) {
                     step++
                 } else if (step == 1 && mathAnswer == mathProblem.second) {
-                    onUnlock()
+                    onVerified()
                 }
             }) {
                 Text("Verify", color = GoNullRed)

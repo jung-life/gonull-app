@@ -43,6 +43,15 @@
             android:taskAffinity=""
             android:theme="@style/Theme.GoNull" />
 
+        <!-- Access Warning Activity (2-minute expiration warning) -->
+        <activity
+            android:name=".ui.screens.warning.AccessWarningActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/Theme.GoNull" />
+
         <!-- Accessibility Service (App Blocker) -->
         <service
             android:name=".service.AppBlockerService"
@@ -74,6 +83,16 @@
             <property
                 android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
                 android:value="App blocking monitor" />
+        </service>
+
+        <!-- Access Expiration Service (monitors active sessions for 2-min warning) -->
+        <service
+            android:name=".service.AccessExpirationService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Access session monitoring" />
         </service>
 
         <!-- Boot Receiver -->

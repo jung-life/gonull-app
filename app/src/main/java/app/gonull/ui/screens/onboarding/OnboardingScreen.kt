@@ -231,7 +231,7 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             ProtocolCard(
                 number = "01",
                 title = "The 20-Second Rule",
-                description = "Your impulse brain fires instantly. Your rational brain takes 20+ seconds to engage. Soft blockers fail because you bypass them in under 10 seconds. Hard friction gives your thinking brain time to catch up."
+                description = "Your rational brain needs 20+ seconds to override impulse. Hard friction buys that time."
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -240,7 +240,7 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             ProtocolCard(
                 number = "02",
                 title = "The Deficit State",
-                description = "After hours of scrolling, you feel worse than when you started. Your brain downregulated dopamine receptors to handle the flood. Now you need MORE stimulation just to feel normal. The only way out is to let your brain recalibrate."
+                description = "Endless scrolling downregulates your dopamine receptors. The only fix is letting your brain recalibrate."
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -249,7 +249,7 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             ProtocolCard(
                 number = "03",
                 title = "The 30-Day Reset",
-                description = "Research shows it takes about 30 days for dopamine receptors to reset. Days 1-10: withdrawal and fog. Days 11-20: clarity returns. Days 21-30: new habits solidify. If you slip, you don't lose progress—the pathway pauses, not dies."
+                description = "It takes ~30 days for receptors to reset. Slipping doesn't erase progress—it just pauses recovery."
             )
 
             Spacer(modifier = Modifier.height(16.dp))

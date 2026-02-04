@@ -10,5 +10,8 @@ data class BlockedAppEntity(
     val appName: String,
     val unlockDelayMinutes: Int = 30,
     val isActive: Boolean = true,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    // Usage budget fields
+    val budgetMinutes: Int? = null, // null = unlimited
+    val budgetEnabled: Boolean = false
 )

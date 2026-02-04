@@ -10,13 +10,16 @@ import app.gonull.data.AppDataCache
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.BlockedAppEntity
 import app.gonull.service.AppBlockerService
+import app.gonull.util.Constants
 import app.gonull.util.PermissionHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 data class AppCategory(
     val name: String,
@@ -76,17 +79,106 @@ class AppSelectionViewModel(
                 _selectedApps.value = existingBlockedApps
             }
 
-            // Check if cache is ready
-            if (AppDataCache.isLoaded.value) {
-                Log.d("AppSelection", "Using cached app data")
-                loadFromCache(context)
-            } else {
+            // Check if cache is ready, if not wait for preload to complete
+            if (!AppDataCache.isLoaded.value) {
                 Log.d("AppSelection", "Cache not ready, triggering preload...")
                 AppDataCache.preload(context)
+
+                // Wait for cache to be loaded with a timeout
+                if (!AppDataCache.isLoaded.value) {
+                    Log.d("AppSelection", "Waiting for cache to load (max 10s)...")
+                    withTimeoutOrNull(10_000L) {
+                        AppDataCache.isLoaded.first { it }
+                    } ?: Log.w("AppSelection", "Cache load timeout, will try direct load")
+                }
+            }
+
+            // Now load from cache (preload is complete at this point)
+            Log.d("AppSelection", "Loading from cache, apps count: ${AppDataCache.apps.value.size}")
+
+            // If cache is empty, try loading directly
+            if (AppDataCache.apps.value.isEmpty()) {
+                Log.w("AppSelection", "Cache is empty, loading apps directly...")
+                loadAppsDirect(context)
+            } else {
                 loadFromCache(context)
             }
 
             _isLoaded.value = true
+            Log.d("AppSelection", "App selection loaded successfully with ${_categorizedApps.value.sumOf { it.apps.size }} apps")
+        }
+    }
+
+    private suspend fun loadAppsDirect(context: Context) {
+        val packageManager = context.packageManager
+
+        withContext(Dispatchers.IO) {
+            try {
+                val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+                Log.d("AppSelection", "Direct load: found ${installedApps.size} total installed apps")
+
+                val launchableApps = installedApps.filter { app ->
+                    // Skip our own app
+                    if (app.packageName == context.packageName) return@filter false
+
+                    val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
+                    val isUpdatedSystemApp = (app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+                    val hasLauncher = try {
+                        packageManager.getLaunchIntentForPackage(app.packageName) != null
+                    } catch (e: Exception) {
+                        false
+                    }
+
+                    isUserApp || isUpdatedSystemApp || hasLauncher
+                }
+
+                Log.d("AppSelection", "Direct load: filtered to ${launchableApps.size} launchable apps")
+
+                // Separate usual suspects from other apps
+                val usualSuspects = mutableListOf<ApplicationInfo>()
+                val otherApps = mutableListOf<ApplicationInfo>()
+
+                launchableApps.forEach { app ->
+                    val pkg = app.packageName.lowercase()
+                    val isUsualSuspect = Constants.USUAL_SUSPECTS.keys.any { suspect ->
+                        pkg == suspect.lowercase()
+                    } || Constants.USUAL_SUSPECT_KEYWORDS.any { keyword ->
+                        pkg.contains(keyword)
+                    }
+
+                    if (isUsualSuspect) {
+                        usualSuspects.add(app)
+                    } else {
+                        otherApps.add(app)
+                    }
+                }
+
+                // Sort alphabetically
+                usualSuspects.sortBy { packageManager.getApplicationLabel(it).toString() }
+                otherApps.sortBy { packageManager.getApplicationLabel(it).toString() }
+
+                Log.d("AppSelection", "Direct load: ${usualSuspects.size} usual suspects, ${otherApps.size} other apps")
+
+                // Build categories
+                val categories = mutableListOf<AppCategory>()
+                if (usualSuspects.isNotEmpty()) {
+                    categories.add(AppCategory("The Usual Suspects", usualSuspects))
+                }
+                if (otherApps.isNotEmpty()) {
+                    categories.add(AppCategory("All Apps", otherApps))
+                }
+
+                withContext(Dispatchers.Main) {
+                    _categorizedApps.value = categories
+
+                    // Auto-select usual suspects if first load and no existing blocked apps
+                    if (!_isLoaded.value && existingBlockedApps.isEmpty()) {
+                        _selectedApps.value = usualSuspects.map { it.packageName }.toSet()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("AppSelection", "Error in direct load", e)
+            }
         }
     }
 
@@ -96,6 +188,8 @@ class AppSelectionViewModel(
         val cachedApps = AppDataCache.apps.value
         val usualSuspectsCached = AppDataCache.usualSuspects.value
         val otherAppsCached = AppDataCache.otherApps.value
+
+        Log.d("AppSelection", "loadFromCache: cachedApps=${cachedApps.size}, suspects=${usualSuspectsCached.size}, others=${otherAppsCached.size}")
 
         // Build usage info map from cache
         val usageMap = cachedApps.associate { cached ->

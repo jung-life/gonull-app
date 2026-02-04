@@ -29,4 +29,13 @@ interface BlockedAppDao {
 
     @Query("UPDATE blocked_apps SET isActive = :isActive WHERE packageName = :packageName")
     suspend fun setAppActive(packageName: String, isActive: Boolean)
+
+    @Query("UPDATE blocked_apps SET budgetMinutes = :budgetMinutes, budgetEnabled = :budgetEnabled WHERE packageName = :packageName")
+    suspend fun updateBudget(packageName: String, budgetMinutes: Int?, budgetEnabled: Boolean)
+
+    @Query("SELECT * FROM blocked_apps WHERE budgetEnabled = 1")
+    suspend fun getAppsWithBudget(): List<BlockedAppEntity>
+
+    @Query("SELECT budgetMinutes FROM blocked_apps WHERE packageName = :packageName AND budgetEnabled = 1")
+    suspend fun getBudgetMinutes(packageName: String): Int?
 }

@@ -79,13 +79,29 @@ object AppDataCache {
 
             // Get all installed apps with launchers
             val allApps = withContext(Dispatchers.IO) {
-                packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
-                    .filter { app ->
-                        val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
-                        val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
-                        // Include user apps and system apps that have launchers
-                        isUserApp || hasLauncher
+                val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+                Log.d(TAG, "Total installed apps: ${installedApps.size}")
+
+                val filtered = installedApps.filter { app ->
+                    // Skip our own app
+                    if (app.packageName == context.packageName) return@filter false
+
+                    val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
+                    val isUpdatedSystemApp = (app.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+
+                    // Try to get launch intent - may fail on some devices
+                    val hasLauncher = try {
+                        packageManager.getLaunchIntentForPackage(app.packageName) != null
+                    } catch (e: Exception) {
+                        false
                     }
+
+                    // Include user apps, updated system apps, or any app with a launcher
+                    isUserApp || isUpdatedSystemApp || hasLauncher
+                }
+
+                Log.d(TAG, "Filtered to ${filtered.size} apps (user/launchable)")
+                filtered
             }
             Log.d(TAG, "Found ${allApps.size} apps")
 
@@ -158,6 +174,8 @@ object AppDataCache {
 
         } catch (e: Exception) {
             Log.e(TAG, "Error during preload", e)
+            // Still mark as loaded to prevent infinite waiting, even if empty
+            _isLoaded.value = true
         } finally {
             _isLoading.value = false
         }
