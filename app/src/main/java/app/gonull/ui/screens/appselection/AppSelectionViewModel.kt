@@ -16,10 +16,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 
 data class AppCategory(
     val name: String,
@@ -60,8 +58,17 @@ class AppSelectionViewModel(
     // Track existing blocked apps to avoid re-selecting defaults
     private var existingBlockedApps: Set<String> = emptySet()
 
+    private var isLoadingInProgress = false
+
     fun loadApps(context: Context) {
+        // Prevent multiple simultaneous loads
+        if (isLoadingInProgress) {
+            Log.d("AppSelection", "Load already in progress, skipping")
+            return
+        }
+
         Log.d("AppSelection", "loadApps called")
+        isLoadingInProgress = true
 
         // Check permission directly - this is the authoritative source
         _hasUsagePermission.value = PermissionHelper.hasUsageStatsPermission(context)
@@ -75,25 +82,15 @@ class AppSelectionViewModel(
             existingBlockedApps = blockedApps.map { it.packageName }.toSet()
 
             // Pre-select already blocked apps
-            if (!_isLoaded.value) {
-                _selectedApps.value = existingBlockedApps
-            }
+            _selectedApps.value = existingBlockedApps
 
-            // Check if cache is ready, if not wait for preload to complete
+            // Check if cache is ready, if not trigger preload
             if (!AppDataCache.isLoaded.value) {
                 Log.d("AppSelection", "Cache not ready, triggering preload...")
                 AppDataCache.preload(context)
-
-                // Wait for cache to be loaded with a timeout
-                if (!AppDataCache.isLoaded.value) {
-                    Log.d("AppSelection", "Waiting for cache to load (max 10s)...")
-                    withTimeoutOrNull(10_000L) {
-                        AppDataCache.isLoaded.first { it }
-                    } ?: Log.w("AppSelection", "Cache load timeout, will try direct load")
-                }
             }
 
-            // Now load from cache (preload is complete at this point)
+            // Now load from cache
             Log.d("AppSelection", "Loading from cache, apps count: ${AppDataCache.apps.value.size}")
 
             // If cache is empty, try loading directly
@@ -105,6 +102,7 @@ class AppSelectionViewModel(
             }
 
             _isLoaded.value = true
+            isLoadingInProgress = false
             Log.d("AppSelection", "App selection loaded successfully with ${_categorizedApps.value.sumOf { it.apps.size }} apps")
         }
     }
@@ -182,9 +180,8 @@ class AppSelectionViewModel(
         }
     }
 
+    @Suppress("UNUSED_PARAMETER")
     private fun loadFromCache(context: Context) {
-        val packageManager = context.packageManager
-
         val cachedApps = AppDataCache.apps.value
         val usualSuspectsCached = AppDataCache.usualSuspects.value
         val otherAppsCached = AppDataCache.otherApps.value
@@ -234,14 +231,19 @@ class AppSelectionViewModel(
             }
         }
 
-        // Build categories
+        // Helper to sort by usage (descending)
+        fun List<ApplicationInfo>.sortedByUsage(): List<ApplicationInfo> {
+            return this.sortedByDescending { usageMap[it.packageName]?.totalTimeInForeground ?: 0L }
+        }
+
+        // Build categories - sorted by usage
         val categories = mutableListOf<AppCategory>()
         if (usualSuspects.isNotEmpty()) categories.add(AppCategory("The Usual Suspects", usualSuspects))
         if (mostUsed.isNotEmpty()) categories.add(AppCategory("Your Top Used This Week", mostUsed))
-        if (socialApps.isNotEmpty()) categories.add(AppCategory("Social & Communication", socialApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-        if (entertainmentApps.isNotEmpty()) categories.add(AppCategory("Entertainment", entertainmentApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-        if (productivityApps.isNotEmpty()) categories.add(AppCategory("Productivity", productivityApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
-        if (otherApps.isNotEmpty()) categories.add(AppCategory("All Other Apps", otherApps.sortedBy { packageManager.getApplicationLabel(it).toString() }))
+        if (socialApps.isNotEmpty()) categories.add(AppCategory("Social & Communication", socialApps.sortedByUsage()))
+        if (entertainmentApps.isNotEmpty()) categories.add(AppCategory("Entertainment", entertainmentApps.sortedByUsage()))
+        if (productivityApps.isNotEmpty()) categories.add(AppCategory("Productivity", productivityApps.sortedByUsage()))
+        if (otherApps.isNotEmpty()) categories.add(AppCategory("All Other Apps", otherApps.sortedByUsage()))
 
         _categorizedApps.value = categories
         Log.d("AppSelection", "Loaded ${categories.size} categories from cache")

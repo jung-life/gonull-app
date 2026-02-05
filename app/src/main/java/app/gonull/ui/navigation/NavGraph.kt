@@ -1,6 +1,8 @@
 package app.gonull.ui.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
@@ -13,6 +15,8 @@ import app.gonull.ui.screens.home.HomeViewModel
 import app.gonull.ui.screens.onboarding.OnboardingScreen
 import app.gonull.ui.screens.intel.IntelScreen
 import app.gonull.ui.screens.settings.SettingsScreen
+import app.gonull.ui.screens.stats.StatsScreen
+import app.gonull.ui.screens.stats.StatsViewModel
 import app.gonull.ui.screens.usageinsights.UsageInsightsScreen
 import app.gonull.ui.screens.usageinsights.UsageInsightsViewModel
 import app.gonull.util.PermissionHelper
@@ -24,6 +28,7 @@ sealed class Screen(val route: String) {
     object AppSelection : Screen("app_selection")
     object Settings : Screen("settings")
     object Intel : Screen("intel")
+    object Stats : Screen("stats")
 }
 
 @Composable
@@ -47,7 +52,7 @@ fun NavGraph(
         }
 
         composable(Screen.UsageInsights.route) {
-            val viewModel = UsageInsightsViewModel(database)
+            val viewModel = remember { UsageInsightsViewModel(database) }
             UsageInsightsScreen(
                 viewModel = viewModel,
                 onComplete = {
@@ -58,7 +63,7 @@ fun NavGraph(
             )
         }
         composable(Screen.Home.route) {
-            val viewModel = HomeViewModel(database)
+            val viewModel = remember { HomeViewModel(database) }
             HomeScreen(
                 viewModel = viewModel,
                 onNavigateToAppSelection = {
@@ -69,6 +74,9 @@ fun NavGraph(
                 },
                 onNavigateToIntel = {
                     navController.navigate(Screen.Intel.route)
+                },
+                onNavigateToStats = {
+                    navController.navigate(Screen.Stats.route)
                 }
             )
         }
@@ -82,7 +90,7 @@ fun NavGraph(
         }
 
         composable(Screen.AppSelection.route) {
-            val viewModel = AppSelectionViewModel(database)
+            val viewModel = remember { AppSelectionViewModel(database) }
             AppSelectionScreen(
                 viewModel = viewModel,
                 onNavigateBack = {
@@ -93,6 +101,20 @@ fun NavGraph(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Stats.route) {
+            val context = LocalContext.current
+            val viewModel = remember { StatsViewModel(database) }
+            LaunchedEffect(Unit) {
+                viewModel.loadStats(context)
+            }
+            StatsScreen(
+                viewModel = viewModel,
                 onNavigateBack = {
                     navController.popBackStack()
                 }

@@ -19,9 +19,10 @@ import app.gonull.data.local.entity.*
         UsageSessionEntity::class,
         AccountabilityPartnerEntity::class,
         PartnerNotificationLogEntity::class,
-        StreakEntity::class
+        StreakEntity::class,
+        FocusModeEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -34,6 +35,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun accountabilityPartnerDao(): AccountabilityPartnerDao
     abstract fun partnerNotificationLogDao(): PartnerNotificationLogDao
     abstract fun streakDao(): StreakDao
+    abstract fun focusModeDao(): FocusModeDao
 
     companion object {
         @Volatile
@@ -126,6 +128,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 3 to 4
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                // Create focus_modes table for Gym Mode and Yoga Mode
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS focus_modes (
+                        modeType TEXT PRIMARY KEY NOT NULL,
+                        isActive INTEGER NOT NULL DEFAULT 0,
+                        activatedAt INTEGER DEFAULT NULL,
+                        expiresAt INTEGER DEFAULT NULL,
+                        allowedPackages TEXT NOT NULL DEFAULT ''
+                    )
+                """)
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -133,7 +151,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gonull_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .build()
                 INSTANCE = instance
                 instance

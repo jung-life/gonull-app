@@ -26,6 +26,10 @@ class HomeViewModel(
     val blockedCountToday: Int
         get() = _blockedCountToday.value
 
+    private val _timeSavedMinutes = MutableStateFlow(0)
+    val timeSavedMinutes: Int
+        get() = _timeSavedMinutes.value
+
     init {
         loadStats()
     }
@@ -35,6 +39,10 @@ class HomeViewModel(
             val todayStart = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(1)
             val count = database.usageLogDao().getBlockedCountSince(todayStart)
             _blockedCountToday.value = count
+
+            // Estimate time saved: each block saves ~15 minutes of potential scrolling
+            // This is a rough estimate based on average session length
+            _timeSavedMinutes.value = count * 15
         }
     }
 

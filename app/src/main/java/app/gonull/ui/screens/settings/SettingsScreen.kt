@@ -9,9 +9,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.gonull.data.local.entity.FocusModeEntity
+import app.gonull.service.FocusModeManager
+import app.gonull.ui.components.GymModeCard
+import app.gonull.ui.components.YogaModeCard
 import app.gonull.ui.theme.*
 import app.gonull.util.PermissionHelper
 import app.gonull.util.DeviceAdminHelper
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -19,6 +24,33 @@ fun SettingsScreen(
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val focusModeManager = remember { FocusModeManager.getInstance(context) }
+
+    // Focus mode states
+    var gymModeActive by remember { mutableStateOf(false) }
+    var yogaModeActive by remember { mutableStateOf(false) }
+    var gymRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var yogaRemainingTime by remember { mutableStateOf<Long?>(null) }
+
+    // Load focus mode states
+    LaunchedEffect(Unit) {
+        gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
+        yogaModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_YOGA)
+        gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
+        yogaRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_YOGA)
+    }
+
+    // Periodically refresh focus mode states
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(5000) // Check every 5 seconds
+            gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
+            yogaModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_YOGA)
+            gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
+            yogaRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_YOGA)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -80,6 +112,64 @@ fun SettingsScreen(
                     description = "Optional: For detailed usage stats",
                     isGranted = PermissionHelper.hasUsageStatsPermission(context),
                     onClick = { PermissionHelper.openUsageStatsSettings(context) }
+                )
+            }
+
+            // Focus Modes Section
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    "Focus Modes",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = GoNullGray,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            item {
+                GymModeCard(
+                    isActive = gymModeActive,
+                    remainingTime = gymRemainingTime,
+                    onToggle = { activate ->
+                        scope.launch {
+                            if (!activate) {
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_GYM)
+                                gymModeActive = false
+                                gymRemainingTime = null
+                            }
+                        }
+                    },
+                    onDurationSelect = { duration ->
+                        scope.launch {
+                            focusModeManager.activateFocusMode(FocusModeEntity.TYPE_GYM, duration)
+                            gymModeActive = true
+                            gymRemainingTime = duration?.let { it * 60 * 1000L }
+                        }
+                    }
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                YogaModeCard(
+                    isActive = yogaModeActive,
+                    remainingTime = yogaRemainingTime,
+                    onToggle = { activate ->
+                        scope.launch {
+                            if (!activate) {
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_YOGA)
+                                yogaModeActive = false
+                                yogaRemainingTime = null
+                            }
+                        }
+                    },
+                    onDurationSelect = { duration ->
+                        scope.launch {
+                            focusModeManager.activateFocusMode(FocusModeEntity.TYPE_YOGA, duration)
+                            yogaModeActive = true
+                            yogaRemainingTime = duration?.let { it * 60 * 1000L }
+                        }
+                    }
                 )
             }
 

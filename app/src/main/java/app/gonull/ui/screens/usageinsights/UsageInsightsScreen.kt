@@ -183,9 +183,13 @@ fun UsageInsightsScreen(
                             }
                         }
 
-                        // Separate usual suspects from other apps
-                        val usualSuspects = filteredApps.filter { it.isUsualSuspect }
-                        val otherApps = filteredApps.filter { !it.isUsualSuspect }
+                        // Separate usual suspects from other apps, sorted by usage
+                        val usualSuspects = filteredApps
+                            .filter { it.isUsualSuspect }
+                            .sortedByDescending { it.totalTimeInForeground }
+                        val otherApps = filteredApps
+                            .filter { !it.isUsualSuspect }
+                            .sortedByDescending { it.totalTimeInForeground }
 
                         // App list
                         LazyColumn(

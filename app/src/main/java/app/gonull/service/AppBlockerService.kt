@@ -19,6 +19,7 @@ class AppBlockerService : AccessibilityService() {
 
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var database: AppDatabase
+    private lateinit var focusModeManager: FocusModeManager
 
     private var lastBlockedPackage: String? = null
     private var lastBlockTime: Long = 0
@@ -28,12 +29,26 @@ class AppBlockerService : AccessibilityService() {
     private var lastCacheUpdate = 0L
     private val cacheTimeout = 60_000L // 1 minute
 
+    // Cache for focus mode allowed apps
+    private var focusModeAllowedCache: Set<String> = emptySet()
+
     // Broadcast receiver for cache invalidation
     private val cacheInvalidationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             Log.d(TAG, "Received cache invalidation broadcast")
             serviceScope.launch {
                 updateBlockedAppsCache()
+                updateFocusModeCache()
+            }
+        }
+    }
+
+    // Broadcast receiver for focus mode changes
+    private val focusModeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            Log.d(TAG, "Received focus mode change broadcast")
+            serviceScope.launch {
+                updateFocusModeCache()
             }
         }
     }
@@ -41,19 +56,32 @@ class AppBlockerService : AccessibilityService() {
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(applicationContext)
+        focusModeManager = FocusModeManager.getInstance(applicationContext)
 
         // Register broadcast receiver for cache invalidation
-        val filter = IntentFilter(ACTION_INVALIDATE_CACHE)
+        val cacheFilter = IntentFilter(ACTION_INVALIDATE_CACHE)
+        val focusFilter = IntentFilter(FocusModeManager.ACTION_FOCUS_MODE_CHANGED)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(cacheInvalidationReceiver, filter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(cacheInvalidationReceiver, cacheFilter, RECEIVER_NOT_EXPORTED)
+            registerReceiver(focusModeReceiver, focusFilter, RECEIVER_NOT_EXPORTED)
         } else {
-            registerReceiver(cacheInvalidationReceiver, filter)
+            registerReceiver(cacheInvalidationReceiver, cacheFilter)
+            registerReceiver(focusModeReceiver, focusFilter)
         }
 
-        // Initialize cache
+        // Initialize caches
         serviceScope.launch {
             updateBlockedAppsCache()
+            updateFocusModeCache()
         }
+    }
+
+    private suspend fun updateFocusModeCache() {
+        val activeModes = focusModeManager.getActiveModes()
+        focusModeAllowedCache = activeModes
+            .flatMap { it.getAllowedPackagesList() }
+            .toSet()
+        Log.d(TAG, "Focus mode cache updated with ${focusModeAllowedCache.size} allowed apps")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -96,10 +124,24 @@ class AppBlockerService : AccessibilityService() {
         val now = System.currentTimeMillis()
         if (now - lastCacheUpdate > cacheTimeout) {
             updateBlockedAppsCache()
+            updateFocusModeCache()
         }
 
         // Check if app is in blocked list (using cache)
         if (!blockedAppsCache.contains(packageName)) return
+
+        // Check if app is allowed by an active focus mode (Gym/Yoga mode)
+        if (focusModeAllowedCache.contains(packageName)) {
+            Log.d(TAG, "App $packageName is allowed by active focus mode")
+            return
+        }
+
+        // Double-check with database for focus mode (in case cache is stale)
+        if (focusModeManager.isPackageAllowedByFocusMode(packageName)) {
+            Log.d(TAG, "App $packageName is allowed by focus mode (db check)")
+            updateFocusModeCache()
+            return
+        }
 
         // Check if there's an active unlock
         val activeUnlock = database.unlockRequestDao().getActiveUnlock(
@@ -140,8 +182,9 @@ class AppBlockerService : AccessibilityService() {
         super.onDestroy()
         try {
             unregisterReceiver(cacheInvalidationReceiver)
+            unregisterReceiver(focusModeReceiver)
         } catch (e: Exception) {
-            Log.e(TAG, "Error unregistering receiver", e)
+            Log.e(TAG, "Error unregistering receivers", e)
         }
         serviceScope.cancel()
     }

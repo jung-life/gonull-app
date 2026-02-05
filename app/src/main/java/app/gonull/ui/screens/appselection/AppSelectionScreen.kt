@@ -47,6 +47,11 @@ fun AppSelectionScreen(
     val isLoaded by viewModel.isLoaded.collectAsState()
     val isSaving by viewModel.isSaving.collectAsState()
 
+    // Load apps on initial composition
+    LaunchedEffect(Unit) {
+        viewModel.loadApps(context)
+    }
+
     // Refresh apps whenever the screen is resumed (e.g., returning from Settings)
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->

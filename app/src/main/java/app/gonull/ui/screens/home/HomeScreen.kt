@@ -14,13 +14,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gonull.data.local.entity.BlockedAppEntity
+import app.gonull.data.local.entity.FocusModeEntity
 import app.gonull.data.local.entity.UnlockRequestEntity
+import app.gonull.service.FocusModeManager
 import app.gonull.ui.components.DailyIntelCard
+import app.gonull.ui.components.QuickFocusModeRow
 import app.gonull.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -28,10 +33,34 @@ fun HomeScreen(
     viewModel: HomeViewModel,
     onNavigateToAppSelection: () -> Unit,
     onNavigateToSettings: () -> Unit,
-    onNavigateToIntel: () -> Unit
+    onNavigateToIntel: () -> Unit,
+    onNavigateToStats: () -> Unit
 ) {
     val blockedApps by viewModel.blockedApps.collectAsState()
     val pendingUnlocks by viewModel.pendingUnlocks.collectAsState()
+
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val focusModeManager = remember { FocusModeManager.getInstance(context) }
+
+    // Focus mode states
+    var gymModeActive by remember { mutableStateOf(false) }
+    var yogaModeActive by remember { mutableStateOf(false) }
+    var gymRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var yogaRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var showGymDurationPicker by remember { mutableStateOf(false) }
+    var showYogaDurationPicker by remember { mutableStateOf(false) }
+
+    // Load and refresh focus mode states
+    LaunchedEffect(Unit) {
+        while (true) {
+            gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
+            yogaModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_YOGA)
+            gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
+            yogaRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_YOGA)
+            kotlinx.coroutines.delay(5000)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -75,9 +104,45 @@ fun HomeScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Stats summary
+            // Focus Mode Quick Toggles
             item {
-                StatsCard(blockedToday = viewModel.blockedCountToday)
+                QuickFocusModeRow(
+                    isGymActive = gymModeActive,
+                    isYogaActive = yogaModeActive,
+                    gymRemainingTime = gymRemainingTime,
+                    yogaRemainingTime = yogaRemainingTime,
+                    onGymClick = {
+                        if (gymModeActive) {
+                            scope.launch {
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_GYM)
+                                gymModeActive = false
+                                gymRemainingTime = null
+                            }
+                        } else {
+                            showGymDurationPicker = true
+                        }
+                    },
+                    onYogaClick = {
+                        if (yogaModeActive) {
+                            scope.launch {
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_YOGA)
+                                yogaModeActive = false
+                                yogaRemainingTime = null
+                            }
+                        } else {
+                            showYogaDurationPicker = true
+                        }
+                    }
+                )
+            }
+
+            // Stats summary (tappable to see full stats)
+            item {
+                StatsCard(
+                    blockedToday = viewModel.blockedCountToday,
+                    timeSavedMinutes = viewModel.timeSavedMinutes,
+                    onTap = onNavigateToStats
+                )
             }
 
             // Daily Intel
@@ -128,11 +193,110 @@ fun HomeScreen(
             }
         }
     }
+
+    // Gym Mode Duration Picker
+    if (showGymDurationPicker) {
+        FocusModeDurationDialog(
+            title = "Start Gym Mode",
+            emoji = "💪",
+            options = listOf(
+                30 to "30 minutes",
+                60 to "1 hour",
+                90 to "1.5 hours",
+                120 to "2 hours",
+                null to "Until I stop"
+            ),
+            onDurationSelect = { duration ->
+                showGymDurationPicker = false
+                scope.launch {
+                    focusModeManager.activateFocusMode(FocusModeEntity.TYPE_GYM, duration)
+                    gymModeActive = true
+                    gymRemainingTime = duration?.let { it * 60 * 1000L }
+                }
+            },
+            onDismiss = { showGymDurationPicker = false }
+        )
+    }
+
+    // Yoga Mode Duration Picker
+    if (showYogaDurationPicker) {
+        FocusModeDurationDialog(
+            title = "Start Yoga Mode",
+            emoji = "🧘",
+            options = listOf(
+                15 to "15 minutes",
+                30 to "30 minutes",
+                45 to "45 minutes",
+                60 to "1 hour",
+                null to "Until I stop"
+            ),
+            onDurationSelect = { duration ->
+                showYogaDurationPicker = false
+                scope.launch {
+                    focusModeManager.activateFocusMode(FocusModeEntity.TYPE_YOGA, duration)
+                    yogaModeActive = true
+                    yogaRemainingTime = duration?.let { it * 60 * 1000L }
+                }
+            },
+            onDismiss = { showYogaDurationPicker = false }
+        )
+    }
 }
 
 @Composable
-fun StatsCard(blockedToday: Int) {
+private fun FocusModeDurationDialog(
+    title: String,
+    emoji: String,
+    options: List<Pair<Int?, String>>,
+    onDurationSelect: (Int?) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = GoNullSurface,
+        title = {
+            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                Text(text = emoji, fontSize = 32.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = title, color = GoNullWhite)
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "Music apps will be allowed during this time",
+                    color = GoNullGray,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                options.forEach { (duration, label) ->
+                    TextButton(
+                        onClick = { onDurationSelect(duration) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = label,
+                            color = if (duration == null) GoNullGreen else GoNullWhite,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = GoNullGray)
+            }
+        }
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatsCard(blockedToday: Int, timeSavedMinutes: Int, onTap: () -> Unit) {
     Card(
+        onClick = onTap,
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = GoNullSurface),
         shape = RoundedCornerShape(12.dp)
@@ -146,24 +310,60 @@ fun StatsCard(blockedToday: Int) {
                 color = GoNullGray
             )
             Spacer(modifier = Modifier.height(8.dp))
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(
-                    text = blockedToday.toString(),
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontSize = 48.sp,
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = GoNullGreen
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "blocks",
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = GoNullGray,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                // Blocks stat
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        text = blockedToday.toString(),
+                        style = MaterialTheme.typography.headlineLarge.copy(
+                            fontSize = 48.sp,
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = GoNullGreen
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "blocks",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = GoNullGray,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                // Time saved stat
+                Column(
+                    horizontalAlignment = Alignment.End
+                ) {
+                    Text(
+                        text = formatTimeSaved(timeSavedMinutes),
+                        style = MaterialTheme.typography.headlineMedium.copy(
+                            fontWeight = FontWeight.Bold
+                        ),
+                        color = GoNullYellow
+                    )
+                    Text(
+                        text = "time saved",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GoNullGray
+                    )
+                }
             }
         }
+    }
+}
+
+private fun formatTimeSaved(minutes: Int): String {
+    return when {
+        minutes >= 60 -> {
+            val hours = minutes / 60
+            val mins = minutes % 60
+            if (mins > 0) "${hours}h ${mins}m" else "${hours}h"
+        }
+        minutes > 0 -> "${minutes}m"
+        else -> "0m"
     }
 }
 
@@ -210,6 +410,7 @@ fun PendingUnlockCard(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BlockedAppCard(
     app: BlockedAppEntity,
@@ -218,6 +419,7 @@ fun BlockedAppCard(
     var showConfirmDialog by remember { mutableStateOf(false) }
 
     Card(
+        onClick = { showConfirmDialog = true },
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = GoNullSurface),
         shape = RoundedCornerShape(12.dp)
@@ -228,7 +430,7 @@ fun BlockedAppCard(
                 .padding(16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f)) {
+            Column {
                 Text(
                     text = app.appName,
                     style = MaterialTheme.typography.bodyLarge,
@@ -239,13 +441,6 @@ fun BlockedAppCard(
                     text = "${app.unlockDelayMinutes} min delay",
                     style = MaterialTheme.typography.bodyMedium,
                     color = GoNullGray
-                )
-            }
-            IconButton(onClick = { showConfirmDialog = true }) {
-                Icon(
-                    Icons.Default.Close,
-                    contentDescription = "Remove",
-                    tint = GoNullGray
                 )
             }
         }

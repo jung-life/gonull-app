@@ -1,6 +1,7 @@
 package app.gonull.ui.screens.onboarding
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -16,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.gonull.R
+import app.gonull.ui.components.VideoPlayer
 import app.gonull.ui.theme.*
 import app.gonull.util.PermissionHelper
 
@@ -41,14 +44,61 @@ fun OnboardingScreen(
     }
 
     when (currentPage) {
-        0 -> WelcomePage(onNext = { currentPage = 1 })
-        1 -> AccessibilityDisclosurePage(onNext = { currentPage = 2 })
-        2 -> PermissionsPage(
+        0 -> VideoIntroPage(
+            onVideoEnd = { currentPage = 1 },
+            onSkip = { currentPage = 1 }
+        )
+        1 -> WelcomePage(onNext = { currentPage = 2 })
+        2 -> AccessibilityDisclosurePage(onNext = { currentPage = 3 })
+        3 -> PermissionsPage(
             accessibilityEnabled = accessibilityEnabled,
             overlayEnabled = overlayEnabled,
             usageStatsEnabled = usageStatsEnabled,
-            onBack = { currentPage = 1 },
+            onBack = { currentPage = 2 },
             onContinue = onComplete
+        )
+    }
+}
+
+@Composable
+fun VideoIntroPage(
+    onVideoEnd: () -> Unit,
+    onSkip: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(GoNullBlack)
+            .clickable(onClick = onSkip)
+    ) {
+        VideoPlayer(
+            videoResId = R.raw.onboarding,
+            modifier = Modifier.fillMaxSize(),
+            onVideoEnd = onVideoEnd
+        )
+
+        // Skip button in top right
+        TextButton(
+            onClick = onSkip,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(16.dp)
+        ) {
+            Text(
+                text = "Skip",
+                color = GoNullWhite.copy(alpha = 0.7f),
+                style = MaterialTheme.typography.labelLarge
+            )
+        }
+
+        // Tap to continue hint at bottom
+        Text(
+            text = "Tap anywhere to continue",
+            color = GoNullWhite.copy(alpha = 0.5f),
+            style = MaterialTheme.typography.bodySmall,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 32.dp)
         )
     }
 }
@@ -373,6 +423,18 @@ fun PermissionsPage(
 ) {
     val context = LocalContext.current
     val allRequiredGranted = accessibilityEnabled && overlayEnabled && usageStatsEnabled
+    var isPreloading by remember { mutableStateOf(false) }
+    var preloadComplete by remember { mutableStateOf(false) }
+
+    // Auto-preload apps when all permissions are granted
+    LaunchedEffect(allRequiredGranted) {
+        if (allRequiredGranted && !preloadComplete && !isPreloading) {
+            isPreloading = true
+            app.gonull.data.AppDataCache.preload(context)
+            preloadComplete = true
+            isPreloading = false
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -461,7 +523,7 @@ fun PermissionsPage(
         // Continue button
         Button(
             onClick = onContinue,
-            enabled = allRequiredGranted,
+            enabled = allRequiredGranted && !isPreloading,
             colors = ButtonDefaults.buttonColors(
                 containerColor = GoNullGreen,
                 contentColor = GoNullBlack,
@@ -470,10 +532,20 @@ fun PermissionsPage(
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text(
-                if (allRequiredGranted) "Continue" else "Grant all permissions to continue",
-                fontWeight = FontWeight.Bold
-            )
+            if (isPreloading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = GoNullBlack,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Preparing your journey...", fontWeight = FontWeight.Bold)
+            } else {
+                Text(
+                    if (allRequiredGranted) "Let's Start Our Journey" else "Grant all permissions to continue",
+                    fontWeight = FontWeight.Bold
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
