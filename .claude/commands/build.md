@@ -1,0 +1,1 @@
+Build the Android debug APK. Run `./gradlew assembleDebug` and report the result. If there are errors, analyze them and suggest fixes. Show the output APK path on success.
