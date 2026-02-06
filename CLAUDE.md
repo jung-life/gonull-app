@@ -42,6 +42,9 @@ GoNull is an Android app blocker that uses commitment contracts to help users br
 - DAOs: `data/local/dao/{Name}Dao.kt`
 - Services: `service/{Name}Service.kt` or `service/{Name}Manager.kt`
 
+## Git Workflow
+- Always push to remote automatically after every commit (`git push`)
+
 ## ADB (if Android SDK is available)
 - ADB path: `~/Library/Android/sdk/platform-tools/adb`
 - Package name: `app.gonull`
