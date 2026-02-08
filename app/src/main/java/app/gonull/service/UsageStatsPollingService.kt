@@ -19,6 +19,7 @@ class UsageStatsPollingService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var database: AppDatabase
     private lateinit var usageStatsManager: UsageStatsManager
+    private lateinit var focusModeManager: FocusModeManager
 
     private val checkInterval = 2000L
     private var lastBlockedPackage: String? = null
@@ -28,10 +29,15 @@ class UsageStatsPollingService : Service() {
     private var lastCacheUpdate = 0L
     private val cacheTimeout = 60_000L
 
+    // Analog mode cache
+    private var isAnalogModeActive: Boolean = false
+    private var analogWhitelistCache: Set<String> = emptySet()
+
     override fun onCreate() {
         super.onCreate()
         database = AppDatabase.getDatabase(applicationContext)
         usageStatsManager = getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
+        focusModeManager = FocusModeManager.getInstance(applicationContext)
         createNotificationChannel()
     }
 
@@ -41,6 +47,7 @@ class UsageStatsPollingService : Service() {
 
         serviceScope.launch {
             updateBlockedAppsCache()
+            updateAnalogModeCache()
             while (isActive) {
                 checkForegroundApp()
                 delay(checkInterval)
@@ -50,10 +57,20 @@ class UsageStatsPollingService : Service() {
         return START_STICKY
     }
 
+    private suspend fun updateAnalogModeCache() {
+        isAnalogModeActive = focusModeManager.isAnalogModeActive()
+        if (isAnalogModeActive) {
+            analogWhitelistCache = focusModeManager.getAnalogWhitelist()
+        } else {
+            analogWhitelistCache = emptySet()
+        }
+    }
+
     private suspend fun checkForegroundApp() {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastCacheUpdate > cacheTimeout) {
             updateBlockedAppsCache()
+            updateAnalogModeCache()
         }
 
         val stats = usageStatsManager.queryUsageStats(
@@ -65,6 +82,19 @@ class UsageStatsPollingService : Service() {
         val foregroundApp = stats?.maxByOrNull { it.lastTimeUsed }?.packageName
 
         if (foregroundApp != null && foregroundApp != applicationContext.packageName) {
+            // Analog mode: block everything except whitelist
+            if (isAnalogModeActive) {
+                if (!analogWhitelistCache.contains(foregroundApp)
+                    && !foregroundApp.startsWith("com.android.systemui")
+                    && !foregroundApp.startsWith("com.android.launcher")
+                    && !foregroundApp.startsWith("com.google.android.launcher")
+                ) {
+                    blockApp(foregroundApp)
+                }
+                return
+            }
+
+            // Normal mode
             if (blockedAppsCache.contains(foregroundApp)) {
                 val activeUnlock = database.unlockRequestDao().getActiveUnlock(
                     foregroundApp,

@@ -12,7 +12,7 @@ import androidx.compose.ui.unit.dp
 import app.gonull.data.local.entity.FocusModeEntity
 import app.gonull.service.FocusModeManager
 import app.gonull.ui.components.GymModeCard
-import app.gonull.ui.components.YogaModeCard
+import app.gonull.ui.components.MeditationModeCard
 import app.gonull.ui.theme.*
 import app.gonull.util.PermissionHelper
 import app.gonull.util.DeviceAdminHelper
@@ -29,16 +29,16 @@ fun SettingsScreen(
 
     // Focus mode states
     var gymModeActive by remember { mutableStateOf(false) }
-    var yogaModeActive by remember { mutableStateOf(false) }
+    var meditationModeActive by remember { mutableStateOf(false) }
     var gymRemainingTime by remember { mutableStateOf<Long?>(null) }
-    var yogaRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var meditationRemainingTime by remember { mutableStateOf<Long?>(null) }
 
     // Load focus mode states
     LaunchedEffect(Unit) {
         gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
-        yogaModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_YOGA)
+        meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
         gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
-        yogaRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_YOGA)
+        meditationRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_MEDITATION)
     }
 
     // Periodically refresh focus mode states
@@ -46,9 +46,9 @@ fun SettingsScreen(
         while (true) {
             kotlinx.coroutines.delay(5000) // Check every 5 seconds
             gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
-            yogaModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_YOGA)
+            meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
             gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
-            yogaRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_YOGA)
+            meditationRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_MEDITATION)
         }
     }
 
@@ -151,23 +151,23 @@ fun SettingsScreen(
 
             item {
                 Spacer(modifier = Modifier.height(12.dp))
-                YogaModeCard(
-                    isActive = yogaModeActive,
-                    remainingTime = yogaRemainingTime,
+                MeditationModeCard(
+                    isActive = meditationModeActive,
+                    remainingTime = meditationRemainingTime,
                     onToggle = { activate ->
                         scope.launch {
                             if (!activate) {
-                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_YOGA)
-                                yogaModeActive = false
-                                yogaRemainingTime = null
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_MEDITATION)
+                                meditationModeActive = false
+                                meditationRemainingTime = null
                             }
                         }
                     },
                     onDurationSelect = { duration ->
                         scope.launch {
-                            focusModeManager.activateFocusMode(FocusModeEntity.TYPE_YOGA, duration)
-                            yogaModeActive = true
-                            yogaRemainingTime = duration?.let { it * 60 * 1000L }
+                            focusModeManager.activateFocusMode(FocusModeEntity.TYPE_MEDITATION, duration)
+                            meditationModeActive = true
+                            meditationRemainingTime = duration?.let { it * 60 * 1000L }
                         }
                     }
                 )

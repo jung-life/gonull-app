@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Manages focus modes (Gym Mode, Yoga Mode) that allow certain apps
+ * Manages focus modes (Gym Mode, Meditation Mode, Analog Mode) that allow certain apps
  * to bypass blocking during specific activities.
  */
 class FocusModeManager(
@@ -54,16 +54,22 @@ class FocusModeManager(
             Log.d(TAG, "Created default Gym Mode")
         }
 
-        // Create Yoga Mode if not exists
-        if (focusModeDao.getMode(FocusModeEntity.TYPE_YOGA) == null) {
-            focusModeDao.insertMode(FocusModeEntity.createYogaMode())
-            Log.d(TAG, "Created default Yoga Mode")
+        // Create Meditation Mode if not exists
+        if (focusModeDao.getMode(FocusModeEntity.TYPE_MEDITATION) == null) {
+            focusModeDao.insertMode(FocusModeEntity.createMeditationMode())
+            Log.d(TAG, "Created default Meditation Mode")
+        }
+
+        // Create Analog Mode if not exists
+        if (focusModeDao.getMode(FocusModeEntity.TYPE_ANALOG) == null) {
+            focusModeDao.insertMode(FocusModeEntity.createAnalogMode())
+            Log.d(TAG, "Created default Analog Mode")
         }
     }
 
     /**
      * Activate a focus mode
-     * @param modeType The type of focus mode (GYM or YOGA)
+     * @param modeType The type of focus mode (GYM, MEDITATION, or ANALOG)
      * @param durationMinutes Duration in minutes, null for indefinite
      */
     suspend fun activateFocusMode(modeType: String, durationMinutes: Int? = null) {
@@ -156,6 +162,21 @@ class FocusModeManager(
     }
 
     /**
+     * Check if Analog Mode is currently active
+     */
+    suspend fun isAnalogModeActive(): Boolean {
+        return isModeActive(FocusModeEntity.TYPE_ANALOG)
+    }
+
+    /**
+     * Get the whitelist of packages allowed during Analog Mode
+     */
+    suspend fun getAnalogWhitelist(): Set<String> {
+        val mode = focusModeDao.getMode(FocusModeEntity.TYPE_ANALOG) ?: return emptySet()
+        return mode.getAllowedPackagesList().toSet()
+    }
+
+    /**
      * Get mode details
      */
     suspend fun getMode(modeType: String): FocusModeEntity? {
@@ -180,6 +201,15 @@ class FocusModeManager(
         val expiresAt = mode.expiresAt ?: return null // null means indefinite
         val remaining = expiresAt - System.currentTimeMillis()
         return if (remaining > 0) remaining else 0
+    }
+
+    /**
+     * Get the activatedAt timestamp for an active mode
+     */
+    suspend fun getActivatedAt(modeType: String): Long? {
+        val mode = focusModeDao.getMode(modeType) ?: return null
+        if (!mode.isActive) return null
+        return mode.activatedAt
     }
 
     private fun notifyFocusModeChanged() {

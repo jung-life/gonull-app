@@ -24,7 +24,7 @@ fun GymModeCard(
 ) {
     FocusModeCard(
         title = "Gym Mode",
-        emoji = "💪",
+        emoji = "\uD83D\uDCAA",
         description = "Music apps play without interruption during your workout",
         activeDescription = "Music apps won't be blocked",
         accentColor = GoNullGreen,
@@ -43,16 +43,16 @@ fun GymModeCard(
 }
 
 @Composable
-fun YogaModeCard(
+fun MeditationModeCard(
     isActive: Boolean,
     remainingTime: Long?,
     onToggle: (Boolean) -> Unit,
     onDurationSelect: (Int?) -> Unit
 ) {
     FocusModeCard(
-        title = "Yoga & Meditation Mode",
-        emoji = "🧘",
-        description = "Calm music and meditation apps for peaceful practice",
+        title = "Meditation Mode",
+        emoji = "\uD83E\uDDD8",
+        description = "Meditation and calm music apps for mindful practice",
         activeDescription = "Meditation & music apps allowed",
         accentColor = GoNullYellow,
         isActive = isActive,
@@ -64,6 +64,33 @@ fun YogaModeCard(
             30 to "30 min",
             45 to "45 min",
             60 to "1 hour",
+            null to "Until I stop"
+        )
+    )
+}
+
+@Composable
+fun AnalogModeCard(
+    isActive: Boolean,
+    remainingTime: Long?,
+    onToggle: (Boolean) -> Unit,
+    onDurationSelect: (Int?) -> Unit
+) {
+    FocusModeCard(
+        title = "Analog Mode",
+        emoji = "\uD83D\uDCDF",
+        description = "Your phone is now a 2005 phone. Only essentials allowed.",
+        activeDescription = "Only Phone, SMS, Maps, Camera, Clock, Calculator",
+        accentColor = GoNullRed,
+        isActive = isActive,
+        remainingTime = remainingTime,
+        onToggle = onToggle,
+        onDurationSelect = onDurationSelect,
+        durationOptions = listOf(
+            30 to "30 min",
+            60 to "1 hour",
+            120 to "2 hours",
+            240 to "4 hours",
             null to "Until I stop"
         )
     )
@@ -132,7 +159,7 @@ fun FocusModeCard(
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = if (displayTime != null) {
-                                        "Active • ${formatRemainingTime(displayTime!!)}"
+                                        "Active \u2022 ${formatRemainingTime(displayTime!!)}"
                                     } else {
                                         "Active"
                                     },

@@ -17,18 +17,24 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import app.gonull.data.local.AppDatabase
+import app.gonull.data.local.entity.BoredomSessionEntity
+import app.gonull.data.local.entity.QuestLogEntity
 import app.gonull.data.local.entity.UnlockRequestEntity
+import app.gonull.data.quest.Quest
 import app.gonull.service.AccessExpirationService
 import app.gonull.service.ProgressiveFrictionManager
 import app.gonull.service.UnlockTimerService
 import app.gonull.service.AccountabilityNotificationService
 import app.gonull.service.UsageBudgetManager
+import app.gonull.ui.components.BoredomTrainingScreen
 import app.gonull.ui.components.CountdownTimer
 import app.gonull.ui.components.LockedUntilTomorrow
+import app.gonull.ui.components.QuestCard
 import app.gonull.ui.components.ReflectionInput
 import app.gonull.ui.components.UsageMirrorCompact
 import app.gonull.ui.components.StreakBreakWarning
 import app.gonull.util.DateHelper
+import app.gonull.util.PreferenceHelper
 import app.gonull.ui.theme.*
 import app.gonull.util.Constants
 import kotlinx.coroutines.launch
@@ -59,6 +65,8 @@ class BlockingOverlayActivity : ComponentActivity() {
         } catch (e: PackageManager.NameNotFoundException) {
             packageName
         }
+
+        val boredomRequired = PreferenceHelper.isBoredomBeforeUnlockEnabled(this)
 
         setContent {
             GoNullTheme {
@@ -100,13 +108,43 @@ class BlockingOverlayActivity : ComponentActivity() {
                     todayUsageMinutes = todayUsageMinutes,
                     weekUsageMinutes = weekUsageMinutes,
                     currentStreak = currentStreak,
+                    boredomRequired = boredomRequired,
                     onRequestUnlock = { requestUnlock(packageName) },
                     onEmergencyUnlock = { emergencyUnlock(packageName) },
                     onBypassWithReflection = { reflection -> bypassWithReflection(packageName, reflection) },
                     onBypassComplete = { recordBypassAndUnlock(packageName) },
+                    onQuestCompleted = { quest -> logQuestCompletion(quest, packageName) },
+                    onBoredomCompleted = { durationSeconds -> logBoredomSession(packageName, durationSeconds, true) },
+                    onBoredomCancelled = { durationSeconds -> logBoredomSession(packageName, durationSeconds, false) },
                     onGoBack = { goHome() }
                 )
             }
+        }
+    }
+
+    private fun logQuestCompletion(quest: Quest, packageName: String) {
+        lifecycleScope.launch {
+            database.questLogDao().insertQuest(
+                QuestLogEntity(
+                    questId = quest.id,
+                    questTitle = quest.title,
+                    questCategory = quest.category.name,
+                    triggeredByPackage = packageName
+                )
+            )
+        }
+    }
+
+    private fun logBoredomSession(packageName: String, durationSeconds: Int, wasCompleted: Boolean) {
+        lifecycleScope.launch {
+            val session = BoredomSessionEntity(
+                startedAt = System.currentTimeMillis() - (durationSeconds * 1000L),
+                completedAt = System.currentTimeMillis(),
+                durationSeconds = durationSeconds,
+                wasCompleted = wasCompleted,
+                triggeredByPackage = packageName
+            )
+            database.boredomSessionDao().insertSession(session)
         }
     }
 
@@ -236,6 +274,7 @@ enum class BypassStep {
     BUNKER_MODE,
     WAIT_COUNTDOWN,
     REFLECTION,
+    BOREDOM_TRAINING,
     LOCKED
 }
 
@@ -251,14 +290,18 @@ fun BlockingScreen(
     todayUsageMinutes: Int,
     weekUsageMinutes: Int,
     currentStreak: Int,
+    boredomRequired: Boolean = false,
     onRequestUnlock: () -> Unit,
     onEmergencyUnlock: () -> Unit,
     onBypassWithReflection: (String) -> Unit,
     onBypassComplete: () -> Unit,
+    onQuestCompleted: (Quest) -> Unit,
+    onBoredomCompleted: (Int) -> Unit,
+    onBoredomCancelled: (Int) -> Unit,
     onGoBack: () -> Unit
 ) {
     var currentStep by remember { mutableStateOf(BypassStep.MAIN) }
-    var pendingReflection by remember { mutableStateOf(false) }
+    var boredomStartTime by remember { mutableLongStateOf(0L) }
 
     // If locked or budget exhausted, show appropriate screen
     LaunchedEffect(isLocked, isBudgetExhausted) {
@@ -285,6 +328,22 @@ fun BlockingScreen(
                     appName = appName,
                     timeUntilReset = timeUntilReset,
                     onGoBack = onGoBack
+                )
+            }
+            currentStep == BypassStep.BOREDOM_TRAINING -> {
+                BoredomTrainingScreen(
+                    durationSeconds = 120,
+                    onComplete = {
+                        val elapsed = ((System.currentTimeMillis() - boredomStartTime) / 1000).toInt()
+                        onBoredomCompleted(elapsed)
+                        // After boredom training, continue to the unlock flow
+                        currentStep = BypassStep.DELAY_VERIFICATION
+                    },
+                    onGiveUp = {
+                        val elapsed = ((System.currentTimeMillis() - boredomStartTime) / 1000).toInt()
+                        onBoredomCancelled(elapsed)
+                        currentStep = BypassStep.MAIN
+                    }
                 )
             }
             currentStep == BypassStep.WAIT_COUNTDOWN -> {
@@ -340,8 +399,21 @@ fun BlockingScreen(
                     todayUsageMinutes = todayUsageMinutes,
                     weekUsageMinutes = weekUsageMinutes,
                     currentStreak = currentStreak,
-                    onStartTimer = { currentStep = BypassStep.DELAY_VERIFICATION },
+                    boredomRequired = boredomRequired,
+                    onStartTimer = {
+                        if (boredomRequired) {
+                            boredomStartTime = System.currentTimeMillis()
+                            currentStep = BypassStep.BOREDOM_TRAINING
+                        } else {
+                            currentStep = BypassStep.DELAY_VERIFICATION
+                        }
+                    },
+                    onStartBoredomTraining = {
+                        boredomStartTime = System.currentTimeMillis()
+                        currentStep = BypassStep.BOREDOM_TRAINING
+                    },
                     onEmergencyAccess = { currentStep = BypassStep.BUNKER_MODE },
+                    onQuestCompleted = onQuestCompleted,
                     onGoBack = onGoBack
                 )
             }
@@ -357,8 +429,11 @@ fun MainBlockingScreen(
     todayUsageMinutes: Int,
     weekUsageMinutes: Int,
     currentStreak: Int,
+    boredomRequired: Boolean = false,
     onStartTimer: () -> Unit,
+    onStartBoredomTraining: () -> Unit,
     onEmergencyAccess: () -> Unit,
+    onQuestCompleted: (Quest) -> Unit,
     onGoBack: () -> Unit
 ) {
     Column(
@@ -366,7 +441,7 @@ fun MainBlockingScreen(
         modifier = Modifier.padding(32.dp)
     ) {
         Text(
-            text = "Ø",
+            text = "\u00D8",
             style = MaterialTheme.typography.headlineLarge.copy(
                 fontSize = 72.sp,
                 color = GoNullGreen
@@ -426,7 +501,30 @@ fun MainBlockingScreen(
             FrictionLevelIndicator(level = frictionLevel)
         }
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Real World Quest Card
+        QuestCard(
+            onQuestCompleted = onQuestCompleted,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Boredom Training button (always available as option)
+        if (!boredomRequired) {
+            OutlinedButton(
+                onClick = onStartBoredomTraining,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = GoNullGray
+                )
+            ) {
+                Text("Boredom Training (2 min)")
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+        }
 
         Button(
             onClick = onStartTimer,
@@ -436,7 +534,10 @@ fun MainBlockingScreen(
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Start 30min Access Timer")
+            Text(
+                if (boredomRequired) "Start Boredom Training + Access Timer"
+                else "Start 30min Access Timer"
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))

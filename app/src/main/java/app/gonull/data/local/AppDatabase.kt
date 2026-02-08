@@ -20,9 +20,12 @@ import app.gonull.data.local.entity.*
         AccountabilityPartnerEntity::class,
         PartnerNotificationLogEntity::class,
         StreakEntity::class,
-        FocusModeEntity::class
+        FocusModeEntity::class,
+        QuestLogEntity::class,
+        BoredomSessionEntity::class,
+        JournalEntryEntity::class
     ],
-    version = 4,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -36,6 +39,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun partnerNotificationLogDao(): PartnerNotificationLogDao
     abstract fun streakDao(): StreakDao
     abstract fun focusModeDao(): FocusModeDao
+    abstract fun questLogDao(): QuestLogDao
+    abstract fun boredomSessionDao(): BoredomSessionDao
+    abstract fun journalEntryDao(): JournalEntryDao
 
     companion object {
         @Volatile
@@ -131,7 +137,7 @@ abstract class AppDatabase : RoomDatabase() {
         // Migration from version 3 to 4
         private val MIGRATION_3_4 = object : Migration(3, 4) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // Create focus_modes table for Gym Mode and Yoga Mode
+                // Create focus_modes table for Gym Mode and Meditation Mode
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS focus_modes (
                         modeType TEXT PRIMARY KEY NOT NULL,
@@ -144,6 +150,52 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 4 to 5: Rename YOGA to MEDITATION
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("UPDATE focus_modes SET modeType = 'MEDITATION' WHERE modeType = 'YOGA'")
+            }
+        }
+
+        // Migration from version 5 to 6: Add quest_log, boredom_sessions, journal_entries
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS quest_log (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        questId TEXT NOT NULL,
+                        questTitle TEXT NOT NULL,
+                        questCategory TEXT NOT NULL,
+                        completedAt INTEGER NOT NULL,
+                        triggeredByPackage TEXT
+                    )
+                """)
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS boredom_sessions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        startedAt INTEGER NOT NULL,
+                        completedAt INTEGER,
+                        durationSeconds INTEGER NOT NULL DEFAULT 0,
+                        wasCompleted INTEGER NOT NULL DEFAULT 0,
+                        triggeredByPackage TEXT,
+                        context TEXT
+                    )
+                """)
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS journal_entries (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        timestamp INTEGER NOT NULL,
+                        entryText TEXT NOT NULL,
+                        linkedFocusMode TEXT,
+                        focusDurationMinutes INTEGER,
+                        mood TEXT
+                    )
+                """)
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = Room.databaseBuilder(
@@ -151,7 +203,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gonull_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                     .build()
                 INSTANCE = instance
                 instance

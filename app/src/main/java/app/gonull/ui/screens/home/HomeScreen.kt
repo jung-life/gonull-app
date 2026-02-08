@@ -45,19 +45,19 @@ fun HomeScreen(
 
     // Focus mode states
     var gymModeActive by remember { mutableStateOf(false) }
-    var yogaModeActive by remember { mutableStateOf(false) }
+    var meditationModeActive by remember { mutableStateOf(false) }
     var gymRemainingTime by remember { mutableStateOf<Long?>(null) }
-    var yogaRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var meditationRemainingTime by remember { mutableStateOf<Long?>(null) }
     var showGymDurationPicker by remember { mutableStateOf(false) }
-    var showYogaDurationPicker by remember { mutableStateOf(false) }
+    var showMeditationDurationPicker by remember { mutableStateOf(false) }
 
     // Load and refresh focus mode states
     LaunchedEffect(Unit) {
         while (true) {
             gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
-            yogaModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_YOGA)
+            meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
             gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
-            yogaRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_YOGA)
+            meditationRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_MEDITATION)
             kotlinx.coroutines.delay(5000)
         }
     }
@@ -108,9 +108,9 @@ fun HomeScreen(
             item {
                 QuickFocusModeRow(
                     isGymActive = gymModeActive,
-                    isYogaActive = yogaModeActive,
+                    isMeditationActive = meditationModeActive,
                     gymRemainingTime = gymRemainingTime,
-                    yogaRemainingTime = yogaRemainingTime,
+                    meditationRemainingTime = meditationRemainingTime,
                     onGymClick = {
                         if (gymModeActive) {
                             scope.launch {
@@ -122,15 +122,15 @@ fun HomeScreen(
                             showGymDurationPicker = true
                         }
                     },
-                    onYogaClick = {
-                        if (yogaModeActive) {
+                    onMeditationClick = {
+                        if (meditationModeActive) {
                             scope.launch {
-                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_YOGA)
-                                yogaModeActive = false
-                                yogaRemainingTime = null
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_MEDITATION)
+                                meditationModeActive = false
+                                meditationRemainingTime = null
                             }
                         } else {
-                            showYogaDurationPicker = true
+                            showMeditationDurationPicker = true
                         }
                     }
                 )
@@ -218,10 +218,10 @@ fun HomeScreen(
         )
     }
 
-    // Yoga Mode Duration Picker
-    if (showYogaDurationPicker) {
+    // Meditation Mode Duration Picker
+    if (showMeditationDurationPicker) {
         FocusModeDurationDialog(
-            title = "Start Yoga Mode",
+            title = "Start Meditation Mode",
             emoji = "🧘",
             options = listOf(
                 15 to "15 minutes",
@@ -231,14 +231,14 @@ fun HomeScreen(
                 null to "Until I stop"
             ),
             onDurationSelect = { duration ->
-                showYogaDurationPicker = false
+                showMeditationDurationPicker = false
                 scope.launch {
-                    focusModeManager.activateFocusMode(FocusModeEntity.TYPE_YOGA, duration)
-                    yogaModeActive = true
-                    yogaRemainingTime = duration?.let { it * 60 * 1000L }
+                    focusModeManager.activateFocusMode(FocusModeEntity.TYPE_MEDITATION, duration)
+                    meditationModeActive = true
+                    meditationRemainingTime = duration?.let { it * 60 * 1000L }
                 }
             },
-            onDismiss = { showYogaDurationPicker = false }
+            onDismiss = { showMeditationDurationPicker = false }
         )
     }
 }

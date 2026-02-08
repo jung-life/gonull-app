@@ -32,6 +32,10 @@ class AppBlockerService : AccessibilityService() {
     // Cache for focus mode allowed apps
     private var focusModeAllowedCache: Set<String> = emptySet()
 
+    // Analog mode cache
+    private var isAnalogModeActive: Boolean = false
+    private var analogWhitelistCache: Set<String> = emptySet()
+
     // Broadcast receiver for cache invalidation
     private val cacheInvalidationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -79,9 +83,20 @@ class AppBlockerService : AccessibilityService() {
     private suspend fun updateFocusModeCache() {
         val activeModes = focusModeManager.getActiveModes()
         focusModeAllowedCache = activeModes
+            .filter { !it.isAnalogMode() }
             .flatMap { it.getAllowedPackagesList() }
             .toSet()
-        Log.d(TAG, "Focus mode cache updated with ${focusModeAllowedCache.size} allowed apps")
+
+        // Update analog mode cache
+        val analogMode = activeModes.find { it.isAnalogMode() }
+        isAnalogModeActive = analogMode != null
+        analogWhitelistCache = if (isAnalogModeActive) {
+            analogMode!!.getAllowedPackagesList().toSet()
+        } else {
+            emptySet()
+        }
+
+        Log.d(TAG, "Focus mode cache updated. Analog active: $isAnalogModeActive, ${focusModeAllowedCache.size} focus-allowed apps")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -97,7 +112,19 @@ class AppBlockerService : AccessibilityService() {
         if (packageName.startsWith("com.android.launcher")) return
         if (packageName.startsWith("com.google.android.launcher")) return
 
-        // Early exit if package is not in cache (optimization)
+        // ANALOG MODE: block everything except whitelist
+        if (isAnalogModeActive) {
+            if (analogWhitelistCache.contains(packageName)) return
+            // Not in whitelist — block it
+            val now = System.currentTimeMillis()
+            if (packageName == lastBlockedPackage && now - lastBlockTime < 1000) return
+            serviceScope.launch {
+                blockApp(packageName)
+            }
+            return
+        }
+
+        // Normal mode: early exit if package is not in blocked cache
         if (!blockedAppsCache.contains(packageName)) return
 
         // Debounce to prevent multiple triggers
@@ -130,7 +157,7 @@ class AppBlockerService : AccessibilityService() {
         // Check if app is in blocked list (using cache)
         if (!blockedAppsCache.contains(packageName)) return
 
-        // Check if app is allowed by an active focus mode (Gym/Yoga mode)
+        // Check if app is allowed by an active focus mode (Gym/Meditation mode)
         if (focusModeAllowedCache.contains(packageName)) {
             Log.d(TAG, "App $packageName is allowed by active focus mode")
             return
@@ -150,6 +177,10 @@ class AppBlockerService : AccessibilityService() {
         )
         if (activeUnlock != null) return
 
+        blockApp(packageName)
+    }
+
+    private suspend fun blockApp(packageName: String) {
         // Block the app
         lastBlockedPackage = packageName
         lastBlockTime = System.currentTimeMillis()

@@ -16,40 +16,60 @@ import androidx.compose.ui.unit.sp
 import app.gonull.ui.theme.*
 
 /**
- * Quick toggle chips for Gym and Yoga modes on the home screen
+ * Quick toggle chips for Analog, Gym and Meditation modes on the home screen
  */
 @Composable
 fun QuickFocusModeRow(
     isGymActive: Boolean,
-    isYogaActive: Boolean,
+    isMeditationActive: Boolean,
+    isAnalogActive: Boolean = false,
     gymRemainingTime: Long?,
-    yogaRemainingTime: Long?,
+    meditationRemainingTime: Long?,
+    analogRemainingTime: Long? = null,
     onGymClick: () -> Unit,
-    onYogaClick: () -> Unit,
+    onMeditationClick: () -> Unit,
+    onAnalogClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Analog Mode - full width on top
         QuickModeChip(
-            emoji = "💪",
-            label = "Gym",
-            isActive = isGymActive,
-            remainingTime = gymRemainingTime,
-            activeColor = GoNullGreen,
-            onClick = onGymClick,
-            modifier = Modifier.weight(1f)
+            emoji = "\uD83D\uDCDF",
+            label = "Analog Mode",
+            isActive = isAnalogActive,
+            remainingTime = analogRemainingTime,
+            activeColor = GoNullRed,
+            onClick = onAnalogClick,
+            modifier = Modifier.fillMaxWidth()
         )
-        QuickModeChip(
-            emoji = "🧘",
-            label = "Yoga",
-            isActive = isYogaActive,
-            remainingTime = yogaRemainingTime,
-            activeColor = GoNullYellow,
-            onClick = onYogaClick,
-            modifier = Modifier.weight(1f)
-        )
+
+        // Gym + Meditation row below
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            QuickModeChip(
+                emoji = "\uD83D\uDCAA",
+                label = "Gym",
+                isActive = isGymActive,
+                remainingTime = gymRemainingTime,
+                activeColor = GoNullGreen,
+                onClick = onGymClick,
+                modifier = Modifier.weight(1f)
+            )
+            QuickModeChip(
+                emoji = "\uD83E\uDDD8",
+                label = "Meditation",
+                isActive = isMeditationActive,
+                remainingTime = meditationRemainingTime,
+                activeColor = GoNullYellow,
+                onClick = onMeditationClick,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }
 
