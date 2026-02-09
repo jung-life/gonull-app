@@ -11,9 +11,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import app.gonull.data.local.entity.FocusModeEntity
 import app.gonull.service.FocusModeManager
+import app.gonull.ui.components.AnalogModeCard
 import app.gonull.ui.components.GymModeCard
 import app.gonull.ui.components.MeditationModeCard
 import app.gonull.ui.theme.*
+import app.gonull.util.PreferenceHelper
 import app.gonull.util.PermissionHelper
 import app.gonull.util.DeviceAdminHelper
 import kotlinx.coroutines.launch
@@ -30,25 +32,34 @@ fun SettingsScreen(
     // Focus mode states
     var gymModeActive by remember { mutableStateOf(false) }
     var meditationModeActive by remember { mutableStateOf(false) }
+    var analogModeActive by remember { mutableStateOf(false) }
     var gymRemainingTime by remember { mutableStateOf<Long?>(null) }
     var meditationRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var analogRemainingTime by remember { mutableStateOf<Long?>(null) }
+
+    // Boredom training preference
+    var boredomEnabled by remember { mutableStateOf(PreferenceHelper.isBoredomBeforeUnlockEnabled(context)) }
 
     // Load focus mode states
     LaunchedEffect(Unit) {
         gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
         meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
+        analogModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_ANALOG)
         gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
         meditationRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_MEDITATION)
+        analogRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_ANALOG)
     }
 
     // Periodically refresh focus mode states
     LaunchedEffect(Unit) {
         while (true) {
-            kotlinx.coroutines.delay(5000) // Check every 5 seconds
+            kotlinx.coroutines.delay(5000)
             gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
             meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
+            analogModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_ANALOG)
             gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
             meditationRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_MEDITATION)
+            analogRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_ANALOG)
         }
     }
 
@@ -169,6 +180,51 @@ fun SettingsScreen(
                             meditationModeActive = true
                             meditationRemainingTime = duration?.let { it * 60 * 1000L }
                         }
+                    }
+                )
+            }
+
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
+                AnalogModeCard(
+                    isActive = analogModeActive,
+                    remainingTime = analogRemainingTime,
+                    onToggle = { activate ->
+                        scope.launch {
+                            if (!activate) {
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_ANALOG)
+                                analogModeActive = false
+                                analogRemainingTime = null
+                            }
+                        }
+                    },
+                    onDurationSelect = { duration ->
+                        scope.launch {
+                            focusModeManager.activateFocusMode(FocusModeEntity.TYPE_ANALOG, duration)
+                            analogModeActive = true
+                            analogRemainingTime = duration?.let { it * 60 * 1000L }
+                        }
+                    }
+                )
+            }
+
+            // Boredom Training Section
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    "Blocking Behavior",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = GoNullGray,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            item {
+                BoredomTrainingToggleCard(
+                    isEnabled = boredomEnabled,
+                    onToggle = { enabled ->
+                        boredomEnabled = enabled
+                        PreferenceHelper.setBoredomBeforeUnlock(context, enabled)
                     }
                 )
             }
@@ -328,6 +384,59 @@ fun LockModeCard() {
                 }
             }
         )
+    }
+}
+
+@Composable
+fun BoredomTrainingToggleCard(
+    isEnabled: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Card(
+        colors = CardDefaults.cardColors(
+            containerColor = if (isEnabled) GoNullYellow.copy(alpha = 0.1f) else GoNullSurface
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Boredom Training",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = GoNullWhite
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = if (isEnabled) "Required before unlocking apps" else "Disabled",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isEnabled) GoNullYellow else GoNullGray
+                    )
+                }
+
+                Switch(
+                    checked = isEnabled,
+                    onCheckedChange = onToggle,
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = GoNullYellow,
+                        checkedTrackColor = GoNullYellow.copy(alpha = 0.5f),
+                        uncheckedThumbColor = GoNullGray,
+                        uncheckedTrackColor = GoNullBorder
+                    )
+                )
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = "When enabled, you must sit through 2 minutes of boredom before the unlock timer starts. This trains your brain to tolerate discomfort without reaching for a screen.",
+                style = MaterialTheme.typography.bodySmall,
+                color = GoNullGray
+            )
+        }
     }
 }
 

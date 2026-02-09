@@ -18,12 +18,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.BlockedAppEntity
 import app.gonull.data.local.entity.FocusModeEntity
 import app.gonull.data.local.entity.UnlockRequestEntity
 import app.gonull.service.FocusModeManager
+import app.gonull.data.local.entity.JournalEntryEntity
 import app.gonull.ui.components.DailyIntelCard
+import app.gonull.ui.components.JournalPromptDialog
 import app.gonull.ui.components.QuickFocusModeRow
+import app.gonull.ui.components.RecentJournalCard
 import app.gonull.ui.theme.*
 import kotlinx.coroutines.launch
 
@@ -31,10 +35,12 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     viewModel: HomeViewModel,
+    database: AppDatabase,
     onNavigateToAppSelection: () -> Unit,
     onNavigateToSettings: () -> Unit,
     onNavigateToIntel: () -> Unit,
-    onNavigateToStats: () -> Unit
+    onNavigateToStats: () -> Unit,
+    onNavigateToJournal: () -> Unit
 ) {
     val blockedApps by viewModel.blockedApps.collectAsState()
     val pendingUnlocks by viewModel.pendingUnlocks.collectAsState()
@@ -46,18 +52,68 @@ fun HomeScreen(
     // Focus mode states
     var gymModeActive by remember { mutableStateOf(false) }
     var meditationModeActive by remember { mutableStateOf(false) }
+    var analogModeActive by remember { mutableStateOf(false) }
     var gymRemainingTime by remember { mutableStateOf<Long?>(null) }
     var meditationRemainingTime by remember { mutableStateOf<Long?>(null) }
+    var analogRemainingTime by remember { mutableStateOf<Long?>(null) }
     var showGymDurationPicker by remember { mutableStateOf(false) }
     var showMeditationDurationPicker by remember { mutableStateOf(false) }
+    var showAnalogDurationPicker by remember { mutableStateOf(false) }
 
-    // Load and refresh focus mode states
+    // Journal prompt state (shown when a focus mode ends)
+    var showJournalPrompt by remember { mutableStateOf(false) }
+    var journalFocusModeName by remember { mutableStateOf("") }
+    var journalFocusDuration by remember { mutableStateOf<Int?>(null) }
+
+    // Journal state
+    var journalTotalEntries by remember { mutableIntStateOf(0) }
+    var journalLatestEntry by remember { mutableStateOf<String?>(null) }
+    var journalLatestMood by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        val entries = database.journalEntryDao().getRecentEntries(1)
+        journalTotalEntries = database.journalEntryDao().getTotalEntries()
+        if (entries.isNotEmpty()) {
+            journalLatestEntry = entries[0].entryText
+            journalLatestMood = entries[0].mood
+        }
+    }
+
+    // Load and refresh focus mode states, detect expired modes
     LaunchedEffect(Unit) {
         while (true) {
+            val wasGymActive = gymModeActive
+            val wasMeditationActive = meditationModeActive
+            val wasAnalogActive = analogModeActive
+
             gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
             meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
+            analogModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_ANALOG)
             gymRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_GYM)
             meditationRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_MEDITATION)
+            analogRemainingTime = focusModeManager.getRemainingTime(FocusModeEntity.TYPE_ANALOG)
+
+            // Detect expired modes and show journal prompt
+            if (!showJournalPrompt) {
+                when {
+                    wasGymActive && !gymModeActive -> {
+                        journalFocusModeName = "Gym Mode"
+                        journalFocusDuration = null
+                        showJournalPrompt = true
+                    }
+                    wasMeditationActive && !meditationModeActive -> {
+                        journalFocusModeName = "Meditation Mode"
+                        journalFocusDuration = null
+                        showJournalPrompt = true
+                    }
+                    wasAnalogActive && !analogModeActive -> {
+                        journalFocusModeName = "Analog Mode"
+                        journalFocusDuration = null
+                        showJournalPrompt = true
+                    }
+                }
+            }
+
             kotlinx.coroutines.delay(5000)
         }
     }
@@ -109,14 +165,21 @@ fun HomeScreen(
                 QuickFocusModeRow(
                     isGymActive = gymModeActive,
                     isMeditationActive = meditationModeActive,
+                    isAnalogActive = analogModeActive,
                     gymRemainingTime = gymRemainingTime,
                     meditationRemainingTime = meditationRemainingTime,
+                    analogRemainingTime = analogRemainingTime,
                     onGymClick = {
                         if (gymModeActive) {
                             scope.launch {
+                                val activatedAt = focusModeManager.getActivatedAt(FocusModeEntity.TYPE_GYM)
+                                val durationMin = activatedAt?.let { ((System.currentTimeMillis() - it) / 60000).toInt() }
                                 focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_GYM)
                                 gymModeActive = false
                                 gymRemainingTime = null
+                                journalFocusModeName = "Gym Mode"
+                                journalFocusDuration = durationMin
+                                showJournalPrompt = true
                             }
                         } else {
                             showGymDurationPicker = true
@@ -125,12 +188,33 @@ fun HomeScreen(
                     onMeditationClick = {
                         if (meditationModeActive) {
                             scope.launch {
+                                val activatedAt = focusModeManager.getActivatedAt(FocusModeEntity.TYPE_MEDITATION)
+                                val durationMin = activatedAt?.let { ((System.currentTimeMillis() - it) / 60000).toInt() }
                                 focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_MEDITATION)
                                 meditationModeActive = false
                                 meditationRemainingTime = null
+                                journalFocusModeName = "Meditation Mode"
+                                journalFocusDuration = durationMin
+                                showJournalPrompt = true
                             }
                         } else {
                             showMeditationDurationPicker = true
+                        }
+                    },
+                    onAnalogClick = {
+                        if (analogModeActive) {
+                            scope.launch {
+                                val activatedAt = focusModeManager.getActivatedAt(FocusModeEntity.TYPE_ANALOG)
+                                val durationMin = activatedAt?.let { ((System.currentTimeMillis() - it) / 60000).toInt() }
+                                focusModeManager.deactivateFocusMode(FocusModeEntity.TYPE_ANALOG)
+                                analogModeActive = false
+                                analogRemainingTime = null
+                                journalFocusModeName = "Analog Mode"
+                                journalFocusDuration = durationMin
+                                showJournalPrompt = true
+                            }
+                        } else {
+                            showAnalogDurationPicker = true
                         }
                     }
                 )
@@ -148,6 +232,16 @@ fun HomeScreen(
             // Daily Intel
             item {
                 DailyIntelCard(onSeeAll = onNavigateToIntel)
+            }
+
+            // Reclaim Journal
+            item {
+                RecentJournalCard(
+                    latestEntry = journalLatestEntry,
+                    latestMood = journalLatestMood,
+                    totalEntries = journalTotalEntries,
+                    onClick = onNavigateToJournal
+                )
             }
 
             // Pending unlocks
@@ -222,7 +316,7 @@ fun HomeScreen(
     if (showMeditationDurationPicker) {
         FocusModeDurationDialog(
             title = "Start Meditation Mode",
-            emoji = "🧘",
+            emoji = "\uD83E\uDDD8",
             options = listOf(
                 15 to "15 minutes",
                 30 to "30 minutes",
@@ -239,6 +333,59 @@ fun HomeScreen(
                 }
             },
             onDismiss = { showMeditationDurationPicker = false }
+        )
+    }
+
+    // Analog Mode Duration Picker
+    if (showAnalogDurationPicker) {
+        FocusModeDurationDialog(
+            title = "Start Analog Mode",
+            emoji = "\uD83D\uDCDF",
+            options = listOf(
+                30 to "30 minutes",
+                60 to "1 hour",
+                120 to "2 hours",
+                240 to "4 hours",
+                null to "Until I stop"
+            ),
+            onDurationSelect = { duration ->
+                showAnalogDurationPicker = false
+                scope.launch {
+                    focusModeManager.activateFocusMode(FocusModeEntity.TYPE_ANALOG, duration)
+                    analogModeActive = true
+                    analogRemainingTime = duration?.let { it * 60 * 1000L }
+                }
+            },
+            onDismiss = { showAnalogDurationPicker = false }
+        )
+    }
+
+    // Journal Prompt Dialog (shown when focus mode ends)
+    if (showJournalPrompt) {
+        JournalPromptDialog(
+            focusModeName = journalFocusModeName,
+            durationMinutes = journalFocusDuration,
+            onSave = { result ->
+                showJournalPrompt = false
+                scope.launch {
+                    database.journalEntryDao().insertEntry(
+                        JournalEntryEntity(
+                            entryText = result.entryText,
+                            linkedFocusMode = journalFocusModeName,
+                            focusDurationMinutes = journalFocusDuration,
+                            mood = result.mood
+                        )
+                    )
+                    // Refresh journal card data
+                    val entries = database.journalEntryDao().getRecentEntries(1)
+                    journalTotalEntries = database.journalEntryDao().getTotalEntries()
+                    if (entries.isNotEmpty()) {
+                        journalLatestEntry = entries[0].entryText
+                        journalLatestMood = entries[0].mood
+                    }
+                }
+            },
+            onSkip = { showJournalPrompt = false }
         )
     }
 }

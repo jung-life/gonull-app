@@ -15,6 +15,7 @@ import app.gonull.ui.screens.home.HomeViewModel
 import app.gonull.ui.screens.onboarding.OnboardingScreen
 import app.gonull.ui.screens.intel.IntelScreen
 import app.gonull.ui.screens.settings.SettingsScreen
+import app.gonull.ui.screens.journal.JournalScreen
 import app.gonull.ui.screens.stats.StatsScreen
 import app.gonull.ui.screens.stats.StatsViewModel
 import app.gonull.ui.screens.usageinsights.UsageInsightsScreen
@@ -29,6 +30,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Intel : Screen("intel")
     object Stats : Screen("stats")
+    object Journal : Screen("journal")
 }
 
 @Composable
@@ -66,6 +68,7 @@ fun NavGraph(
             val viewModel = remember { HomeViewModel(database) }
             HomeScreen(
                 viewModel = viewModel,
+                database = database,
                 onNavigateToAppSelection = {
                     navController.navigate(Screen.AppSelection.route)
                 },
@@ -77,6 +80,9 @@ fun NavGraph(
                 },
                 onNavigateToStats = {
                     navController.navigate(Screen.Stats.route)
+                },
+                onNavigateToJournal = {
+                    navController.navigate(Screen.Journal.route)
                 }
             )
         }
@@ -115,6 +121,15 @@ fun NavGraph(
             }
             StatsScreen(
                 viewModel = viewModel,
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
+            )
+        }
+
+        composable(Screen.Journal.route) {
+            JournalScreen(
+                database = database,
                 onNavigateBack = {
                     navController.popBackStack()
                 }
