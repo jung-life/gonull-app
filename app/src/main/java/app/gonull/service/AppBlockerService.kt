@@ -29,8 +29,9 @@ class AppBlockerService : AccessibilityService() {
     private var lastCacheUpdate = 0L
     private val cacheTimeout = 60_000L // 1 minute
 
-    // Cache for focus mode allowed apps
+    // Cache for focus mode allowed apps (Gym/Meditation whitelist)
     private var focusModeAllowedCache: Set<String> = emptySet()
+    private var isFocusModeActive: Boolean = false
 
     // Analog mode cache
     private var isAnalogModeActive: Boolean = false
@@ -82,8 +83,9 @@ class AppBlockerService : AccessibilityService() {
 
     private suspend fun updateFocusModeCache() {
         val activeModes = focusModeManager.getActiveModes()
-        focusModeAllowedCache = activeModes
-            .filter { !it.isAnalogMode() }
+        val nonAnalogModes = activeModes.filter { !it.isAnalogMode() }
+        isFocusModeActive = nonAnalogModes.isNotEmpty()
+        focusModeAllowedCache = nonAnalogModes
             .flatMap { it.getAllowedPackagesList() }
             .toSet()
 
@@ -96,7 +98,7 @@ class AppBlockerService : AccessibilityService() {
             emptySet()
         }
 
-        Log.d(TAG, "Focus mode cache updated. Analog active: $isAnalogModeActive, ${focusModeAllowedCache.size} focus-allowed apps")
+        Log.d(TAG, "Focus mode cache updated. Analog active: $isAnalogModeActive, Focus active: $isFocusModeActive, ${focusModeAllowedCache.size} focus-allowed apps")
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
@@ -116,6 +118,18 @@ class AppBlockerService : AccessibilityService() {
         if (isAnalogModeActive) {
             if (analogWhitelistCache.contains(packageName)) return
             // Not in whitelist — block it
+            val now = System.currentTimeMillis()
+            if (packageName == lastBlockedPackage && now - lastBlockTime < 1000) return
+            serviceScope.launch {
+                blockApp(packageName)
+            }
+            return
+        }
+
+        // FOCUS MODE (Gym/Meditation): block everything except allowed apps
+        if (isFocusModeActive) {
+            if (focusModeAllowedCache.contains(packageName)) return
+            // Not in allowed list — block it
             val now = System.currentTimeMillis()
             if (packageName == lastBlockedPackage && now - lastBlockTime < 1000) return
             serviceScope.launch {

@@ -29,6 +29,10 @@ class UsageStatsPollingService : Service() {
     private var lastCacheUpdate = 0L
     private val cacheTimeout = 60_000L
 
+    // Focus mode cache (Gym/Meditation)
+    private var isFocusModeActive: Boolean = false
+    private var focusModeAllowedCache: Set<String> = emptySet()
+
     // Analog mode cache
     private var isAnalogModeActive: Boolean = false
     private var analogWhitelistCache: Set<String> = emptySet()
@@ -47,7 +51,7 @@ class UsageStatsPollingService : Service() {
 
         serviceScope.launch {
             updateBlockedAppsCache()
-            updateAnalogModeCache()
+            updateFocusModeCache()
             while (isActive) {
                 checkForegroundApp()
                 delay(checkInterval)
@@ -57,12 +61,20 @@ class UsageStatsPollingService : Service() {
         return START_STICKY
     }
 
-    private suspend fun updateAnalogModeCache() {
-        isAnalogModeActive = focusModeManager.isAnalogModeActive()
-        if (isAnalogModeActive) {
-            analogWhitelistCache = focusModeManager.getAnalogWhitelist()
+    private suspend fun updateFocusModeCache() {
+        val activeModes = focusModeManager.getActiveModes()
+        val nonAnalogModes = activeModes.filter { !it.isAnalogMode() }
+        isFocusModeActive = nonAnalogModes.isNotEmpty()
+        focusModeAllowedCache = nonAnalogModes
+            .flatMap { it.getAllowedPackagesList() }
+            .toSet()
+
+        val analogMode = activeModes.find { it.isAnalogMode() }
+        isAnalogModeActive = analogMode != null
+        analogWhitelistCache = if (isAnalogModeActive) {
+            analogMode!!.getAllowedPackagesList().toSet()
         } else {
-            analogWhitelistCache = emptySet()
+            emptySet()
         }
     }
 
@@ -70,7 +82,7 @@ class UsageStatsPollingService : Service() {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastCacheUpdate > cacheTimeout) {
             updateBlockedAppsCache()
-            updateAnalogModeCache()
+            updateFocusModeCache()
         }
 
         val stats = usageStatsManager.queryUsageStats(
@@ -82,13 +94,21 @@ class UsageStatsPollingService : Service() {
         val foregroundApp = stats?.maxByOrNull { it.lastTimeUsed }?.packageName
 
         if (foregroundApp != null && foregroundApp != applicationContext.packageName) {
+            val isSystemApp = foregroundApp.startsWith("com.android.systemui")
+                    || foregroundApp.startsWith("com.android.launcher")
+                    || foregroundApp.startsWith("com.google.android.launcher")
+
             // Analog mode: block everything except whitelist
             if (isAnalogModeActive) {
-                if (!analogWhitelistCache.contains(foregroundApp)
-                    && !foregroundApp.startsWith("com.android.systemui")
-                    && !foregroundApp.startsWith("com.android.launcher")
-                    && !foregroundApp.startsWith("com.google.android.launcher")
-                ) {
+                if (!analogWhitelistCache.contains(foregroundApp) && !isSystemApp) {
+                    blockApp(foregroundApp)
+                }
+                return
+            }
+
+            // Focus mode (Gym/Meditation): block everything except allowed apps
+            if (isFocusModeActive) {
+                if (!focusModeAllowedCache.contains(foregroundApp) && !isSystemApp) {
                     blockApp(foregroundApp)
                 }
                 return
