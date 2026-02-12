@@ -802,6 +802,8 @@ fun BunkerModeDialog(
 
     var mathProblem by remember { mutableStateOf(generateMathProblem()) }
     var mathAnswer by remember { mutableStateOf("") }
+    var codeError by remember { mutableStateOf(false) }
+    var mathError by remember { mutableStateOf(false) }
 
     val frictionDescription = when (frictionLevel) {
         Constants.Friction.LEVEL_2_BYPASS -> "After verification, you'll need to wait 5 minutes."
@@ -827,16 +829,31 @@ fun BunkerModeDialog(
                         Text(requiredCode, style = MaterialTheme.typography.headlineMedium, color = GoNullYellow)
                         OutlinedTextField(
                             value = inputCode,
-                            onValueChange = { inputCode = it },
+                            onValueChange = {
+                                inputCode = it
+                                codeError = false
+                            },
                             modifier = Modifier.fillMaxWidth(),
+                            isError = codeError,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = GoNullWhite,
                                 unfocusedTextColor = GoNullWhite,
                                 cursorColor = GoNullYellow,
                                 focusedBorderColor = GoNullYellow,
-                                unfocusedBorderColor = GoNullGray
+                                unfocusedBorderColor = GoNullGray,
+                                errorBorderColor = GoNullRed,
+                                errorTextColor = GoNullWhite,
+                                errorCursorColor = GoNullRed
                             )
                         )
+                        if (codeError) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Wrong code. Try again.",
+                                color = GoNullRed,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
                     }
                     1 -> {
                         Text("Final Barrier: Solve this to prove your prefrontal cortex is active, not your impulsive limbic system.", color = GoNullGray, textAlign = TextAlign.Center)
@@ -844,26 +861,59 @@ fun BunkerModeDialog(
                         Text(mathProblem.first, style = MaterialTheme.typography.headlineMedium, color = GoNullYellow)
                         OutlinedTextField(
                             value = mathAnswer,
-                            onValueChange = { mathAnswer = it },
+                            onValueChange = {
+                                mathAnswer = it
+                                mathError = false
+                            },
                             modifier = Modifier.fillMaxWidth(),
+                            isError = mathError,
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = GoNullWhite,
                                 unfocusedTextColor = GoNullWhite,
                                 cursorColor = GoNullYellow,
                                 focusedBorderColor = GoNullYellow,
-                                unfocusedBorderColor = GoNullGray
+                                unfocusedBorderColor = GoNullGray,
+                                errorBorderColor = GoNullRed,
+                                errorTextColor = GoNullWhite,
+                                errorCursorColor = GoNullRed
                             )
                         )
+                        if (mathError) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Wrong answer. Try again.",
+                                color = GoNullRed,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(12.dp))
+                        TextButton(onClick = {
+                            mathProblem = generateMathProblem()
+                            mathAnswer = ""
+                            mathError = false
+                        }) {
+                            Text("Different question", color = GoNullYellow)
+                        }
                     }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                if (step == 0 && inputCode == requiredCode) {
-                    step++
-                } else if (step == 1 && mathAnswer == mathProblem.second) {
-                    onVerified()
+                if (step == 0) {
+                    if (inputCode == requiredCode) {
+                        codeError = false
+                        step++
+                    } else {
+                        codeError = true
+                    }
+                } else if (step == 1) {
+                    if (mathAnswer == mathProblem.second) {
+                        mathError = false
+                        onVerified()
+                    } else {
+                        mathError = true
+                    }
                 }
             }) {
                 Text("Verify", color = GoNullRed)
