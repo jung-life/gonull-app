@@ -318,10 +318,10 @@ fun HomeScreen(
             title = "Start Meditation Mode",
             emoji = "\uD83E\uDDD8",
             options = listOf(
+                5 to "5 minutes",
+                10 to "10 minutes",
                 15 to "15 minutes",
                 30 to "30 minutes",
-                45 to "45 minutes",
-                60 to "1 hour",
                 null to "Until I stop"
             ),
             onDurationSelect = { duration ->

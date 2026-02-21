@@ -1,5 +1,6 @@
 package app.gonull.ui.screens.journal
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.JournalEntryEntity
 import app.gonull.ui.theme.*
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -28,6 +30,8 @@ fun JournalScreen(
 ) {
     val entries by database.journalEntryDao().getAllEntriesFlow().collectAsState(initial = emptyList())
     var totalEntries by remember { mutableIntStateOf(0) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(entries) {
         totalEntries = entries.size
@@ -36,6 +40,23 @@ fun JournalScreen(
     // Count moods
     val moodCounts = remember(entries) {
         entries.groupBy { it.mood ?: "neutral" }.mapValues { it.value.size }
+    }
+
+    if (showAddDialog) {
+        AddJournalEntryDialog(
+            onSave = { text, mood ->
+                scope.launch {
+                    database.journalEntryDao().insertEntry(
+                        JournalEntryEntity(
+                            entryText = text,
+                            mood = mood
+                        )
+                    )
+                }
+                showAddDialog = false
+            },
+            onDismiss = { showAddDialog = false }
+        )
     }
 
     Scaffold(
@@ -61,6 +82,15 @@ fun JournalScreen(
                     containerColor = GoNullBlack
                 )
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showAddDialog = true },
+                containerColor = GoNullGreen,
+                contentColor = GoNullBlack
+            ) {
+                Text("+", fontSize = 24.sp, fontWeight = FontWeight.Bold)
+            }
         },
         containerColor = GoNullBlack
     ) { padding ->
@@ -136,7 +166,7 @@ fun JournalScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Entries appear here when you record what you did after a focus mode ends.",
+                            text = "Tap + to add an entry, or they'll appear automatically after a focus mode ends.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = GoNullGray.copy(alpha = 0.6f),
                             textAlign = TextAlign.Center
@@ -213,4 +243,103 @@ fun JournalEntryItem(entry: JournalEntryEntity) {
             }
         }
     }
+}
+
+@Composable
+fun AddJournalEntryDialog(
+    onSave: (text: String, mood: String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var entryText by remember { mutableStateOf("") }
+    var selectedMood by remember { mutableStateOf<String?>(null) }
+
+    val moods = listOf(
+        "\uD83D\uDE0A" to "great",
+        "\uD83D\uDE42" to "good",
+        "\uD83D\uDE10" to "neutral",
+        "\uD83D\uDE11" to "meh"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = GoNullSurface,
+        title = {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(
+                    text = "\uD83D\uDCD3",
+                    fontSize = 32.sp
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "New Journal Entry",
+                    color = GoNullWhite,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        },
+        text = {
+            Column {
+                Text(
+                    text = "How do you feel?",
+                    color = GoNullGray,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    moods.forEach { (emoji, mood) ->
+                        Surface(
+                            modifier = Modifier.clickable { selectedMood = mood },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selectedMood == mood) GoNullGreen.copy(alpha = 0.2f) else GoNullBlack
+                        ) {
+                            Text(
+                                text = emoji,
+                                fontSize = 28.sp,
+                                modifier = Modifier.padding(12.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = entryText,
+                    onValueChange = { entryText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("What's on your mind?", color = GoNullGray.copy(alpha = 0.5f)) },
+                    minLines = 3,
+                    maxLines = 5,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = GoNullWhite,
+                        unfocusedTextColor = GoNullWhite,
+                        cursorColor = GoNullGreen,
+                        focusedBorderColor = GoNullGreen,
+                        unfocusedBorderColor = GoNullBorder
+                    )
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSave(entryText, selectedMood ?: "neutral") },
+                enabled = entryText.isNotBlank(),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = GoNullGreen,
+                    contentColor = GoNullBlack
+                )
+            ) {
+                Text("Save", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel", color = GoNullGray)
+            }
+        }
+    )
 }

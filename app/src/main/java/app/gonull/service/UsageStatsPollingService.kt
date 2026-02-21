@@ -93,14 +93,12 @@ class UsageStatsPollingService : Service() {
 
         val foregroundApp = stats?.maxByOrNull { it.lastTimeUsed }?.packageName
 
-        if (foregroundApp != null && foregroundApp != applicationContext.packageName) {
-            val isSystemApp = foregroundApp.startsWith("com.android.systemui")
-                    || foregroundApp.startsWith("com.android.launcher")
-                    || foregroundApp.startsWith("com.google.android.launcher")
+        if (foregroundApp != null && foregroundApp != applicationContext.packageName
+            && !isSystemOrLauncher(foregroundApp)) {
 
             // Analog mode: block everything except whitelist
             if (isAnalogModeActive) {
-                if (!analogWhitelistCache.contains(foregroundApp) && !isSystemApp) {
+                if (!analogWhitelistCache.contains(foregroundApp)) {
                     blockApp(foregroundApp)
                 }
                 return
@@ -108,7 +106,7 @@ class UsageStatsPollingService : Service() {
 
             // Focus mode (Gym/Meditation): block everything except allowed apps
             if (isFocusModeActive) {
-                if (!focusModeAllowedCache.contains(foregroundApp) && !isSystemApp) {
+                if (!focusModeAllowedCache.contains(foregroundApp)) {
                     blockApp(foregroundApp)
                 }
                 return
@@ -192,6 +190,32 @@ class UsageStatsPollingService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         serviceScope.cancel()
+    }
+
+    private fun isSystemOrLauncher(packageName: String): Boolean {
+        return packageName.startsWith("com.android.systemui")
+                || packageName.startsWith("com.android.launcher")
+                || packageName.startsWith("com.google.android.launcher")
+                || packageName.startsWith("com.google.android.apps.nexuslauncher")
+                || packageName.startsWith("com.sec.android.app.launcher")
+                || packageName.startsWith("com.sec.android.launcher")
+                || packageName.startsWith("com.miui.home")
+                || packageName.startsWith("com.miui.launcher")
+                || packageName.startsWith("com.oneplus.launcher")
+                || packageName.startsWith("com.oppo.launcher")
+                || packageName.startsWith("com.realme.launcher")
+                || packageName.startsWith("com.vivo.launcher")
+                || packageName.startsWith("com.huawei.android.launcher")
+                || packageName.startsWith("com.honor.launcher")
+                || packageName.startsWith("com.motorola.launcher")
+                || packageName.startsWith("com.nothing.launcher")
+                || packageName.startsWith("com.teslacoilsw.launcher")
+                || packageName.startsWith("com.microsoft.launcher")
+                || packageName.startsWith("com.actionlauncher")
+                || packageName.startsWith("com.novalauncher")
+                || packageName.endsWith(".launcher")
+                || packageName.endsWith(".home")
+                || packageName.startsWith("com.android.settings")
     }
 
     companion object {

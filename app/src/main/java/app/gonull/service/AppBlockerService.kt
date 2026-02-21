@@ -106,13 +106,9 @@ class AppBlockerService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: return
 
-        // Ignore our own app
+        // Ignore our own app and system/launcher packages
         if (packageName == applicationContext.packageName) return
-
-        // Ignore system UI and launchers (optimization)
-        if (packageName.startsWith("com.android.systemui")) return
-        if (packageName.startsWith("com.android.launcher")) return
-        if (packageName.startsWith("com.google.android.launcher")) return
+        if (isSystemOrLauncher(packageName)) return
 
         // ANALOG MODE: block everything except whitelist
         if (isAnalogModeActive) {
@@ -232,6 +228,32 @@ class AppBlockerService : AccessibilityService() {
             Log.e(TAG, "Error unregistering receivers", e)
         }
         serviceScope.cancel()
+    }
+
+    private fun isSystemOrLauncher(packageName: String): Boolean {
+        return packageName.startsWith("com.android.systemui")
+                || packageName.startsWith("com.android.launcher")
+                || packageName.startsWith("com.google.android.launcher")
+                || packageName.startsWith("com.google.android.apps.nexuslauncher")
+                || packageName.startsWith("com.sec.android.app.launcher")
+                || packageName.startsWith("com.sec.android.launcher")
+                || packageName.startsWith("com.miui.home")
+                || packageName.startsWith("com.miui.launcher")
+                || packageName.startsWith("com.oneplus.launcher")
+                || packageName.startsWith("com.oppo.launcher")
+                || packageName.startsWith("com.realme.launcher")
+                || packageName.startsWith("com.vivo.launcher")
+                || packageName.startsWith("com.huawei.android.launcher")
+                || packageName.startsWith("com.honor.launcher")
+                || packageName.startsWith("com.motorola.launcher")
+                || packageName.startsWith("com.nothing.launcher")
+                || packageName.startsWith("com.teslacoilsw.launcher")
+                || packageName.startsWith("com.microsoft.launcher")
+                || packageName.startsWith("com.actionlauncher")
+                || packageName.startsWith("com.novalauncher")
+                || packageName.endsWith(".launcher")
+                || packageName.endsWith(".home")
+                || packageName.startsWith("com.android.settings")
     }
 
     companion object {
