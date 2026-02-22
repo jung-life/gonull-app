@@ -13,5 +13,7 @@ data class BlockedAppEntity(
     val createdAt: Long = System.currentTimeMillis(),
     // Usage budget fields
     val budgetMinutes: Int? = null, // null = unlimited
-    val budgetEnabled: Boolean = false
+    val budgetEnabled: Boolean = false,
+    // 24h cooling-off: null = not pending, timestamp = when it will be unblocked
+    val pendingUnblockAt: Long? = null
 )

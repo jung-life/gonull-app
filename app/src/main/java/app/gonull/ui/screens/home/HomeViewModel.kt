@@ -32,6 +32,7 @@ class HomeViewModel(
 
     init {
         loadStats()
+        cleanupExpiredPendingUnblocks()
     }
 
     private fun loadStats() {
@@ -46,9 +47,22 @@ class HomeViewModel(
         }
     }
 
-    fun removeBlockedApp(app: BlockedAppEntity) {
+    private fun cleanupExpiredPendingUnblocks() {
         viewModelScope.launch {
-            database.blockedAppDao().deleteBlockedApp(app)
+            database.blockedAppDao().removeExpiredPendingUnblocks(System.currentTimeMillis())
+        }
+    }
+
+    fun scheduleUnblock(app: BlockedAppEntity) {
+        viewModelScope.launch {
+            val unblockAt = System.currentTimeMillis() + TimeUnit.HOURS.toMillis(24)
+            database.blockedAppDao().setPendingUnblock(app.packageName, unblockAt)
+        }
+    }
+
+    fun cancelPendingUnblock(app: BlockedAppEntity) {
+        viewModelScope.launch {
+            database.blockedAppDao().setPendingUnblock(app.packageName, null)
         }
     }
 

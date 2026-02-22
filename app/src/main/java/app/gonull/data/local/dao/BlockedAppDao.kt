@@ -38,4 +38,13 @@ interface BlockedAppDao {
 
     @Query("SELECT budgetMinutes FROM blocked_apps WHERE packageName = :packageName AND budgetEnabled = 1")
     suspend fun getBudgetMinutes(packageName: String): Int?
+
+    @Query("UPDATE blocked_apps SET pendingUnblockAt = :unblockAt WHERE packageName = :packageName")
+    suspend fun setPendingUnblock(packageName: String, unblockAt: Long?)
+
+    @Query("DELETE FROM blocked_apps WHERE pendingUnblockAt IS NOT NULL AND pendingUnblockAt <= :currentTime")
+    suspend fun removeExpiredPendingUnblocks(currentTime: Long)
+
+    @Query("SELECT * FROM blocked_apps WHERE pendingUnblockAt IS NOT NULL")
+    fun getPendingUnblocks(): Flow<List<BlockedAppEntity>>
 }

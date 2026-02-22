@@ -281,7 +281,8 @@ fun HomeScreen(
                 items(blockedApps) { app ->
                     BlockedAppCard(
                         app = app,
-                        onRemove = { viewModel.removeBlockedApp(app) }
+                        onScheduleUnblock = { viewModel.scheduleUnblock(app) },
+                        onCancelUnblock = { viewModel.cancelPendingUnblock(app) }
                     )
                 }
             }
@@ -561,65 +562,127 @@ fun PendingUnlockCard(
 @Composable
 fun BlockedAppCard(
     app: BlockedAppEntity,
-    onRemove: () -> Unit
+    onScheduleUnblock: () -> Unit,
+    onCancelUnblock: () -> Unit
 ) {
     var showConfirmDialog by remember { mutableStateOf(false) }
+    val isPendingUnblock = app.pendingUnblockAt != null
+
+    // Countdown state for pending unblock
+    var remainingText by remember { mutableStateOf("") }
+    if (isPendingUnblock) {
+        LaunchedEffect(app.pendingUnblockAt) {
+            while (true) {
+                val remaining = (app.pendingUnblockAt ?: 0) - System.currentTimeMillis()
+                if (remaining <= 0) {
+                    remainingText = "Unblocking..."
+                    break
+                }
+                val hours = remaining / (1000 * 60 * 60)
+                val minutes = (remaining % (1000 * 60 * 60)) / (1000 * 60)
+                remainingText = "${hours}h ${minutes}m remaining"
+                kotlinx.coroutines.delay(60_000)
+            }
+        }
+    }
 
     Card(
         onClick = { showConfirmDialog = true },
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = GoNullSurface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPendingUnblock) GoNullRed.copy(alpha = 0.1f) else GoNullSurface
+        ),
         shape = RoundedCornerShape(12.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = app.appName,
                     style = MaterialTheme.typography.bodyLarge,
                     color = GoNullWhite
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "${app.unlockDelayMinutes} min delay",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GoNullGray
-                )
+                if (isPendingUnblock) {
+                    Text(
+                        text = "Pending unblock \u2022 $remainingText",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GoNullYellow
+                    )
+                } else {
+                    Text(
+                        text = "${app.unlockDelayMinutes} min delay",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GoNullGray
+                    )
+                }
             }
         }
     }
 
     if (showConfirmDialog) {
-        AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
-            containerColor = GoNullSurface,
-            title = {
-                Text("Unblock ${app.appName}?", color = GoNullWhite)
-            },
-            text = {
-                Text(
-                    "This will remove the app from your blocked list.",
-                    color = GoNullGray
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showConfirmDialog = false
-                    onRemove()
-                }) {
-                    Text("Yes, unblock", color = GoNullRed)
+        if (isPendingUnblock) {
+            // Already pending — offer to cancel
+            AlertDialog(
+                onDismissRequest = { showConfirmDialog = false },
+                containerColor = GoNullSurface,
+                title = {
+                    Text("Cancel unblock?", color = GoNullWhite)
+                },
+                text = {
+                    Text(
+                        "Keep ${app.appName} blocked and cancel the pending unblock.",
+                        color = GoNullGray
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showConfirmDialog = false
+                        onCancelUnblock()
+                    }) {
+                        Text("Keep blocked", color = GoNullGreen)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirmDialog = false }) {
+                        Text("Dismiss", color = GoNullGray)
+                    }
                 }
-            },
-            dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
-                    Text("Cancel", color = GoNullGray)
+            )
+        } else {
+            // Not pending — 24h cooling-off confirmation
+            AlertDialog(
+                onDismissRequest = { showConfirmDialog = false },
+                containerColor = GoNullSurface,
+                title = {
+                    Text("Unblock ${app.appName}?", color = GoNullWhite)
+                },
+                text = {
+                    Text(
+                        "To prevent impulsive decisions, unblocking requires a 24-hour cooling-off period. The app will be removed from your blocked list tomorrow.",
+                        color = GoNullGray
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showConfirmDialog = false
+                        onScheduleUnblock()
+                    }) {
+                        Text("Start 24h countdown", color = GoNullRed)
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showConfirmDialog = false }) {
+                        Text("Keep blocked", color = GoNullGreen)
+                    }
                 }
-            }
-        )
+            )
+        }
     }
 }
 
