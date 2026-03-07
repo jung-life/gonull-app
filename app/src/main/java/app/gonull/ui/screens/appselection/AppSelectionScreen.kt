@@ -46,6 +46,7 @@ fun AppSelectionScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val isLoaded by viewModel.isLoaded.collectAsState()
     val isSaving by viewModel.
+
     isSaving.collectAsState()
 
     // Load apps on initial composition

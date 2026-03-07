@@ -9,6 +9,7 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import app.gonull.R
 import app.gonull.data.local.AppDatabase
+import app.gonull.ui.screens.reflection.PostSessionReflectionActivity
 import app.gonull.ui.screens.warning.AccessWarningActivity
 import app.gonull.util.Constants
 import kotlinx.coroutines.*
@@ -129,6 +130,15 @@ class AccessExpirationService : Service() {
 
         // Show notification
         showExpiredNotification(session.packageName)
+
+        // Launch post-session reflection
+        val sessionMinutes = ((System.currentTimeMillis() - session.startTime) / 60000).toInt()
+        val reflectionIntent = Intent(applicationContext, PostSessionReflectionActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(PostSessionReflectionActivity.EXTRA_PACKAGE_NAME, session.packageName)
+            putExtra(PostSessionReflectionActivity.EXTRA_SESSION_MINUTES, sessionMinutes)
+        }
+        startActivity(reflectionIntent)
     }
 
     private fun handleWarningSession(session: AccessSessionManager.ActiveSessionInfo) {

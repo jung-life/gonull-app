@@ -24,11 +24,14 @@ import app.gonull.data.local.entity.FocusModeEntity
 import app.gonull.data.local.entity.UnlockRequestEntity
 import app.gonull.service.FocusModeManager
 import app.gonull.data.local.entity.JournalEntryEntity
+import app.gonull.data.local.entity.DailyCommitmentEntity
 import app.gonull.ui.components.DailyIntelCard
 import app.gonull.ui.components.JournalPromptDialog
+import app.gonull.ui.components.MorningCommitmentCard
 import app.gonull.ui.components.QuickFocusModeRow
 import app.gonull.ui.components.RecentJournalCard
 import app.gonull.ui.theme.*
+import app.gonull.util.DateHelper
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -70,6 +73,10 @@ fun HomeScreen(
     var journalLatestEntry by remember { mutableStateOf<String?>(null) }
     var journalLatestMood by remember { mutableStateOf<String?>(null) }
 
+    // Morning commitment state
+    var todayCommitment by remember { mutableStateOf<String?>(null) }
+    var commitmentLoaded by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
         val entries = database.journalEntryDao().getRecentEntries(1)
         journalTotalEntries = database.journalEntryDao().getTotalEntries()
@@ -77,6 +84,12 @@ fun HomeScreen(
             journalLatestEntry = entries[0].entryText
             journalLatestMood = entries[0].mood
         }
+
+        // Load today's commitment
+        val today = DateHelper.getTodayString()
+        val commitment = database.dailyCommitmentDao().getCommitmentForDate(today)
+        todayCommitment = commitment?.commitmentText
+        commitmentLoaded = true
     }
 
     // Load and refresh focus mode states, detect expired modes
@@ -160,6 +173,27 @@ fun HomeScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Morning Commitment Card
+            if (commitmentLoaded) {
+                item {
+                    MorningCommitmentCard(
+                        existingCommitment = todayCommitment,
+                        onSaveCommitment = { text ->
+                            scope.launch {
+                                val today = DateHelper.getTodayString()
+                                database.dailyCommitmentDao().insertCommitment(
+                                    DailyCommitmentEntity(
+                                        date = today,
+                                        commitmentText = text
+                                    )
+                                )
+                                todayCommitment = text
+                            }
+                        }
+                    )
+                }
+            }
+
             // Focus Mode Quick Toggles
             item {
                 QuickFocusModeRow(

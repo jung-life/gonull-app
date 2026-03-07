@@ -9,10 +9,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.FocusModeEntity
+import app.gonull.data.local.entity.ImplementationIntentionEntity
 import app.gonull.service.FocusModeManager
 import app.gonull.ui.components.AnalogModeCard
 import app.gonull.ui.components.GymModeCard
+import app.gonull.ui.components.IntentionManagementSection
 import app.gonull.ui.components.MeditationModeCard
 import app.gonull.ui.theme.*
 import app.gonull.util.PreferenceHelper
@@ -23,6 +26,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    database: AppDatabase,
     onNavigateBack: () -> Unit
 ) {
     val context = LocalContext.current
@@ -40,8 +44,12 @@ fun SettingsScreen(
     // Boredom training preference
     var boredomEnabled by remember { mutableStateOf(PreferenceHelper.isBoredomBeforeUnlockEnabled(context)) }
 
-    // Load focus mode states
+    // Implementation intentions state
+    var intentions by remember { mutableStateOf<List<ImplementationIntentionEntity>>(emptyList()) }
+
+    // Load focus mode states and intentions
     LaunchedEffect(Unit) {
+        intentions = database.implementationIntentionDao().getAllActiveIntentions()
         gymModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_GYM)
         meditationModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_MEDITATION)
         analogModeActive = focusModeManager.isModeActive(FocusModeEntity.TYPE_ANALOG)
@@ -203,6 +211,28 @@ fun SettingsScreen(
                             focusModeManager.activateFocusMode(FocusModeEntity.TYPE_ANALOG, duration)
                             analogModeActive = true
                             analogRemainingTime = duration?.let { it * 60 * 1000L }
+                        }
+                    }
+                )
+            }
+
+            // Implementation Intentions Section
+            item {
+                Spacer(modifier = Modifier.height(24.dp))
+                IntentionManagementSection(
+                    intentions = intentions,
+                    onAddIntention = { action ->
+                        scope.launch {
+                            database.implementationIntentionDao().insertIntention(
+                                ImplementationIntentionEntity(thenAction = action)
+                            )
+                            intentions = database.implementationIntentionDao().getAllActiveIntentions()
+                        }
+                    },
+                    onDeleteIntention = { intention ->
+                        scope.launch {
+                            database.implementationIntentionDao().deleteIntention(intention)
+                            intentions = database.implementationIntentionDao().getAllActiveIntentions()
                         }
                     }
                 )

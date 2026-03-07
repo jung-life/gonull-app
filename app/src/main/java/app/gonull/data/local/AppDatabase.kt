@@ -23,9 +23,13 @@ import app.gonull.data.local.entity.*
         FocusModeEntity::class,
         QuestLogEntity::class,
         BoredomSessionEntity::class,
-        JournalEntryEntity::class
+        JournalEntryEntity::class,
+        TriggerLogEntity::class,
+        PostSessionReflectionEntity::class,
+        ImplementationIntentionEntity::class,
+        DailyCommitmentEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -42,6 +46,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun questLogDao(): QuestLogDao
     abstract fun boredomSessionDao(): BoredomSessionDao
     abstract fun journalEntryDao(): JournalEntryDao
+    abstract fun triggerLogDao(): TriggerLogDao
+    abstract fun postSessionReflectionDao(): PostSessionReflectionDao
+    abstract fun implementationIntentionDao(): ImplementationIntentionDao
+    abstract fun dailyCommitmentDao(): DailyCommitmentDao
 
     companion object {
         @Volatile
@@ -164,6 +172,50 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // Migration from version 7 to 8: Add rehab technique tables
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS trigger_logs (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        `trigger` TEXT NOT NULL,
+                        cravingIntensity INTEGER NOT NULL,
+                        timestamp INTEGER NOT NULL
+                    )
+                """)
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS post_session_reflections (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        worthItRating INTEGER NOT NULL,
+                        reflectionText TEXT,
+                        sessionDurationMinutes INTEGER,
+                        timestamp INTEGER NOT NULL
+                    )
+                """)
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS implementation_intentions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        packageName TEXT,
+                        thenAction TEXT NOT NULL,
+                        isActive INTEGER NOT NULL DEFAULT 1,
+                        createdAt INTEGER NOT NULL
+                    )
+                """)
+
+                db.execSQL("""
+                    CREATE TABLE IF NOT EXISTS daily_commitments (
+                        date TEXT PRIMARY KEY NOT NULL,
+                        commitmentText TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                """)
+            }
+        }
+
         // Migration from version 5 to 6: Add quest_log, boredom_sessions, journal_entries
         private val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -210,7 +262,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "gonull_database"
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
                 INSTANCE = instance
                 instance

@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import app.gonull.data.local.dao.TriggerCount
 import app.gonull.ui.theme.*
 import java.text.SimpleDateFormat
 import java.util.*
@@ -29,6 +30,11 @@ fun StatsScreen(
     val recentActivity by viewModel.recentActivity.collectAsState()
     val topBlockedApps by viewModel.topBlockedApps.collectAsState()
     val motivationalMessage by viewModel.motivationalMessage.collectAsState()
+    val triggerCounts by viewModel.triggerCounts.collectAsState()
+    val avgCraving by viewModel.avgCraving.collectAsState()
+    val avgWorthIt by viewModel.avgWorthIt.collectAsState()
+    val notWorthItCount by viewModel.notWorthItCount.collectAsState()
+    val totalReflections by viewModel.totalReflections.collectAsState()
 
     Scaffold(
         topBar = {
@@ -87,6 +93,27 @@ fun StatsScreen(
                     totalBlocks = stats.totalBlocks,
                     totalBypasses = stats.totalBypasses
                 )
+            }
+
+            // Trigger Patterns
+            if (triggerCounts.isNotEmpty()) {
+                item {
+                    TriggerPatternsCard(
+                        triggerCounts = triggerCounts,
+                        avgCraving = avgCraving
+                    )
+                }
+            }
+
+            // Session Insights
+            if (totalReflections > 0) {
+                item {
+                    SessionInsightsCard(
+                        avgWorthIt = avgWorthIt,
+                        notWorthItCount = notWorthItCount,
+                        totalReflections = totalReflections
+                    )
+                }
             }
 
             // Top Blocked Apps
@@ -488,6 +515,115 @@ fun EncouragementFooter() {
                 color = GoNullGreen,
                 modifier = Modifier.padding(top = 4.dp)
             )
+        }
+    }
+}
+
+@Composable
+fun TriggerPatternsCard(
+    triggerCounts: List<TriggerCount>,
+    avgCraving: Float?
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GoNullSurface),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "TRIGGER PATTERNS",
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 2.sp),
+                color = GoNullYellow
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            triggerCounts.forEach { item ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = item.trigger.lowercase()
+                            .replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GoNullWhite
+                    )
+                    Text(
+                        text = "${item.count}x",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GoNullYellow,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            avgCraving?.let { avg ->
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = GoNullBorder)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Avg craving intensity: %.1f/5".format(avg),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GoNullGray
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SessionInsightsCard(
+    avgWorthIt: Float?,
+    notWorthItCount: Int,
+    totalReflections: Int
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = GoNullSurface),
+        shape = RoundedCornerShape(16.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "SESSION INSIGHTS",
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 2.sp),
+                color = GoNullYellow
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+
+            avgWorthIt?.let { avg ->
+                Text(
+                    text = "Avg \"worth it\" rating: %.1f/5".format(avg),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = GoNullWhite
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            if (totalReflections > 0) {
+                val notWorthPercent = (notWorthItCount.toFloat() / totalReflections * 100).toInt()
+                Text(
+                    text = "$notWorthPercent% of sessions weren't worth it",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (notWorthPercent >= 50) GoNullRed else GoNullYellow,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Based on $totalReflections reflections",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GoNullGray
+                )
+            }
         }
     }
 }

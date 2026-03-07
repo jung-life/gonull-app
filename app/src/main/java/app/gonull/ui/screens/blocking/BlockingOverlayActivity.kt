@@ -26,11 +26,14 @@ import app.gonull.service.ProgressiveFrictionManager
 import app.gonull.service.UnlockTimerService
 import app.gonull.service.AccountabilityNotificationService
 import app.gonull.service.UsageBudgetManager
+import app.gonull.data.local.entity.TriggerLogEntity
 import app.gonull.ui.components.BoredomTrainingScreen
 import app.gonull.ui.components.CountdownTimer
+import app.gonull.ui.components.ImplementationIntentionCard
 import app.gonull.ui.components.LockedUntilTomorrow
 import app.gonull.ui.components.QuestCard
 import app.gonull.ui.components.ReflectionInput
+import app.gonull.ui.components.TriggerCravingInterstitial
 import app.gonull.ui.components.UsageMirrorCompact
 import app.gonull.ui.components.StreakBreakWarning
 import app.gonull.util.DateHelper
@@ -78,6 +81,7 @@ class BlockingOverlayActivity : ComponentActivity() {
                 var todayUsageMinutes by remember { mutableIntStateOf(0) }
                 var weekUsageMinutes by remember { mutableIntStateOf(0) }
                 var currentStreak by remember { mutableIntStateOf(0) }
+                var intentionAction by remember { mutableStateOf<String?>(null) }
 
                 LaunchedEffect(packageName) {
                     frictionLevel = frictionManager.getNextFrictionLevel(packageName)
@@ -95,6 +99,10 @@ class BlockingOverlayActivity : ComponentActivity() {
                     // Load streak
                     val streak = database.streakDao().getStreak(packageName)
                     currentStreak = streak?.currentStreak ?: 0
+
+                    // Load implementation intention
+                    val intention = database.implementationIntentionDao().getIntentionForApp(packageName)
+                    intentionAction = intention?.thenAction
                 }
 
                 BlockingScreen(
@@ -109,6 +117,10 @@ class BlockingOverlayActivity : ComponentActivity() {
                     weekUsageMinutes = weekUsageMinutes,
                     currentStreak = currentStreak,
                     boredomRequired = boredomRequired,
+                    intentionAction = intentionAction,
+                    onTriggerRecorded = { trigger, craving ->
+                        logTrigger(packageName, trigger, craving)
+                    },
                     onRequestUnlock = { requestUnlock(packageName) },
                     onEmergencyUnlock = { emergencyUnlock(packageName) },
                     onBypassWithReflection = { reflection -> bypassWithReflection(packageName, reflection) },
@@ -119,6 +131,18 @@ class BlockingOverlayActivity : ComponentActivity() {
                     onGoBack = { goHome() }
                 )
             }
+        }
+    }
+
+    private fun logTrigger(packageName: String, trigger: String, cravingIntensity: Int) {
+        lifecycleScope.launch {
+            database.triggerLogDao().insertTrigger(
+                TriggerLogEntity(
+                    packageName = packageName,
+                    trigger = trigger,
+                    cravingIntensity = cravingIntensity
+                )
+            )
         }
     }
 
@@ -269,6 +293,7 @@ class BlockingOverlayActivity : ComponentActivity() {
 }
 
 enum class BypassStep {
+    TRIGGER_INTERSTITIAL,
     MAIN,
     DELAY_VERIFICATION,
     BUNKER_MODE,
@@ -291,6 +316,8 @@ fun BlockingScreen(
     weekUsageMinutes: Int,
     currentStreak: Int,
     boredomRequired: Boolean = false,
+    intentionAction: String? = null,
+    onTriggerRecorded: (String, Int) -> Unit = { _, _ -> },
     onRequestUnlock: () -> Unit,
     onEmergencyUnlock: () -> Unit,
     onBypassWithReflection: (String) -> Unit,
@@ -300,7 +327,9 @@ fun BlockingScreen(
     onBoredomCancelled: (Int) -> Unit,
     onGoBack: () -> Unit
 ) {
-    var currentStep by remember { mutableStateOf(BypassStep.MAIN) }
+    // Show trigger interstitial first, unless locked or budget exhausted
+    val initialStep = if (!isLocked && !isBudgetExhausted) BypassStep.TRIGGER_INTERSTITIAL else BypassStep.MAIN
+    var currentStep by remember { mutableStateOf(initialStep) }
     var boredomStartTime by remember { mutableLongStateOf(0L) }
 
     // If locked or budget exhausted, show appropriate screen
@@ -317,6 +346,16 @@ fun BlockingScreen(
         contentAlignment = Alignment.Center
     ) {
         when {
+            currentStep == BypassStep.TRIGGER_INTERSTITIAL -> {
+                TriggerCravingInterstitial(
+                    appName = appName,
+                    onComplete = { trigger, craving ->
+                        onTriggerRecorded(trigger, craving)
+                        currentStep = BypassStep.MAIN
+                    },
+                    onSkip = { currentStep = BypassStep.MAIN }
+                )
+            }
             isBudgetExhausted -> {
                 BudgetExhaustedScreen(
                     appName = appName,
@@ -400,6 +439,7 @@ fun BlockingScreen(
                     weekUsageMinutes = weekUsageMinutes,
                     currentStreak = currentStreak,
                     boredomRequired = boredomRequired,
+                    intentionAction = intentionAction,
                     onStartTimer = {
                         if (boredomRequired) {
                             boredomStartTime = System.currentTimeMillis()
@@ -430,6 +470,7 @@ fun MainBlockingScreen(
     weekUsageMinutes: Int,
     currentStreak: Int,
     boredomRequired: Boolean = false,
+    intentionAction: String? = null,
     onStartTimer: () -> Unit,
     onStartBoredomTraining: () -> Unit,
     onEmergencyAccess: () -> Unit,
@@ -459,12 +500,19 @@ fun MainBlockingScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        Text(
-            text = "Is this app serving your long-term goals?",
-            style = MaterialTheme.typography.bodyLarge,
-            color = GoNullGray,
-            textAlign = TextAlign.Center
-        )
+        if (intentionAction != null) {
+            ImplementationIntentionCard(
+                thenAction = intentionAction,
+                modifier = Modifier.fillMaxWidth()
+            )
+        } else {
+            Text(
+                text = "Is this app serving your long-term goals?",
+                style = MaterialTheme.typography.bodyLarge,
+                color = GoNullGray,
+                textAlign = TextAlign.Center
+            )
+        }
 
         Spacer(modifier = Modifier.height(16.dp))
 

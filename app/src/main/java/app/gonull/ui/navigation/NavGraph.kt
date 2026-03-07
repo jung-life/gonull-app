@@ -107,6 +107,7 @@ fun NavGraph(
 
         composable(Screen.Settings.route) {
             SettingsScreen(
+                database = database,
                 onNavigateBack = {
                     navController.popBackStack()
                 }

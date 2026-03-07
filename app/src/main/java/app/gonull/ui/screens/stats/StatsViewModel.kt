@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gonull.data.local.AppDatabase
+import app.gonull.data.local.dao.TriggerCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,21 @@ class StatsViewModel(
 
     private val _motivationalMessage = MutableStateFlow(getRandomMotivationalMessage())
     val motivationalMessage: StateFlow<String> = _motivationalMessage.asStateFlow()
+
+    private val _triggerCounts = MutableStateFlow<List<TriggerCount>>(emptyList())
+    val triggerCounts: StateFlow<List<TriggerCount>> = _triggerCounts.asStateFlow()
+
+    private val _avgCraving = MutableStateFlow<Float?>(null)
+    val avgCraving: StateFlow<Float?> = _avgCraving.asStateFlow()
+
+    private val _avgWorthIt = MutableStateFlow<Float?>(null)
+    val avgWorthIt: StateFlow<Float?> = _avgWorthIt.asStateFlow()
+
+    private val _notWorthItCount = MutableStateFlow(0)
+    val notWorthItCount: StateFlow<Int> = _notWorthItCount.asStateFlow()
+
+    private val _totalReflections = MutableStateFlow(0)
+    val totalReflections: StateFlow<Int> = _totalReflections.asStateFlow()
 
     fun loadStats(context: Context) {
         viewModelScope.launch {
@@ -95,6 +111,15 @@ class StatsViewModel(
 
                 // Update motivational message based on stats
                 _motivationalMessage.value = getMotivationalMessage(totalBlocks, todayBlocks)
+
+                // Load trigger pattern stats
+                _triggerCounts.value = database.triggerLogDao().getTriggerCounts()
+                _avgCraving.value = database.triggerLogDao().getAverageCravingIntensity()
+
+                // Load post-session reflection stats
+                _avgWorthIt.value = database.postSessionReflectionDao().getAverageWorthItRating()
+                _notWorthItCount.value = database.postSessionReflectionDao().getNotWorthItCount()
+                _totalReflections.value = database.postSessionReflectionDao().getTotalReflections()
             }
         }
     }
