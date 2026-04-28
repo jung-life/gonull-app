@@ -30,7 +30,7 @@ import app.gonull.data.local.entity.*
         DailyCommitmentEntity::class
     ],
     version = 8,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun blockedAppDao(): BlockedAppDao

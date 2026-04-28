@@ -1,5 +1,7 @@
 package app.gonull.ui.screens.onboarding
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,11 +17,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import app.gonull.R
 import app.gonull.ui.components.VideoPlayer
 import app.gonull.ui.theme.*
+import app.gonull.util.Constants
 import app.gonull.util.PermissionHelper
 
 @Composable
@@ -347,8 +351,31 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             Text("Set Up Permissions", fontWeight = FontWeight.Bold)
         }
 
+        Spacer(modifier = Modifier.height(12.dp))
+
+        PrivacyPolicyLink()
+
         Spacer(modifier = Modifier.height(16.dp))
     }
+}
+
+@Composable
+fun PrivacyPolicyLink() {
+    val context = LocalContext.current
+    Text(
+        text = "Privacy Policy",
+        style = MaterialTheme.typography.bodySmall,
+        color = GoNullGray,
+        textAlign = TextAlign.Center,
+        textDecoration = TextDecoration.Underline,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(Constants.PRIVACY_POLICY_URL))
+                )
+            }
+    )
 }
 
 @Composable

@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import app.gonull.R
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UsageLogEntity
 import app.gonull.ui.MainActivity
@@ -169,7 +170,7 @@ class UsageStatsPollingService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("GoNull Active")
             .setContentText("Monitoring apps")
-            .setSmallIcon(android.R.drawable.ic_dialog_info) // Changed to public icon
+            .setSmallIcon(R.drawable.ic_notification)
             .setOngoing(true)
             .setContentIntent(pendingIntent)
             .build()

@@ -23,6 +23,19 @@
         android:theme="@style/Theme.GoNull"
         tools:targetApi="31">
 
+        <!-- Disable Firebase Analytics' auto-collection of Advertising ID + SSAID,
+             so the app is honestly "no AdID, no advertising signals" for Play
+             data-safety. Crashlytics still works. -->
+        <meta-data
+            android:name="google_analytics_adid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="google_analytics_ssaid_collection_enabled"
+            android:value="false" />
+        <meta-data
+            android:name="firebase_analytics_collection_deactivated"
+            android:value="true" />
+
         <!-- Main Activity -->
         <activity
             android:name=".ui.MainActivity"
@@ -110,6 +123,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
 

@@ -1,6 +1,9 @@
 package app.gonull.util
 
 object Constants {
+    // Public-facing URLs
+    const val PRIVACY_POLICY_URL = "https://gist.github.com/jung-life/401c90e08c2d1eb0892eb4fd5d57189f"
+
     // Default settings
     const val DEFAULT_UNLOCK_DELAY_MINUTES = 30
     const val DEFAULT_ACCESS_DURATION_MINUTES = 15

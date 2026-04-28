@@ -1,5 +1,8 @@
 package app.gonull.ui.screens.settings
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -8,6 +11,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.FocusModeEntity
@@ -18,6 +22,7 @@ import app.gonull.ui.components.GymModeCard
 import app.gonull.ui.components.IntentionManagementSection
 import app.gonull.ui.components.MeditationModeCard
 import app.gonull.ui.theme.*
+import app.gonull.util.Constants
 import app.gonull.util.PreferenceHelper
 import app.gonull.util.PermissionHelper
 import app.gonull.util.DeviceAdminHelper
@@ -304,6 +309,18 @@ fun SettingsScreen(
                             "An app blocker that uses commitment contracts to help you break social media addiction.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = GoNullGray
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Privacy Policy",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GoNullGreen,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(Constants.PRIVACY_POLICY_URL))
+                                )
+                            }
                         )
                     }
                 }
