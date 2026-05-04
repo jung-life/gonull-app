@@ -306,7 +306,7 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "An app blocker that uses commitment contracts to help you break social media addiction.",
+                            "An app blocker that uses commitment contracts to help you build healthier digital habits.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = GoNullGray
                         )
@@ -319,6 +319,18 @@ fun SettingsScreen(
                             modifier = Modifier.clickable {
                                 context.startActivity(
                                     Intent(Intent.ACTION_VIEW, Uri.parse(Constants.PRIVACY_POLICY_URL))
+                                )
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Send beta feedback",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GoNullGreen,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(Constants.BETA_FEEDBACK_URL))
                                 )
                             }
                         )

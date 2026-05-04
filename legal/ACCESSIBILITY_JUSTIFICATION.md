@@ -13,40 +13,39 @@ can verify they match.
 
 ## Short version (Play Console field)
 
-GoNull is an app blocker for users with ADHD, executive-function challenges,
-and digital-impulse disorders. The Accessibility Service is used **only** to
-detect when a user-selected blocked app comes to the foreground (the
-`TYPE_WINDOW_STATE_CHANGED` event), so GoNull can immediately render an
-on-screen friction barrier asking the user to confirm or wait through a
-delay before proceeding.
+GoNull is a digital-wellbeing app blocker. The Accessibility Service is used
+**only** to detect when a user-selected blocked app comes to the foreground
+(the `TYPE_WINDOW_STATE_CHANGED` event), so GoNull can immediately render an
+on-screen friction barrier asking the user to confirm or wait through a delay
+before proceeding.
 
 GoNull does not read the contents of any screen, capture text, monitor
 keystrokes, or record any user input. Only the package-name field of the
 window-state-change event is inspected, and only against a list of apps the
-user has explicitly chosen to block. Nothing is transmitted off the device —
-the app does not declare the `INTERNET` permission. Accessibility access is
-the only practical way to reliably interrupt an addictive-app launch on
-modern Android; the alternative (`UsageStatsManager` polling) introduces a
-2-second lag during which the harmful behavior is already occurring,
-defeating the user's goal.
+user has explicitly chosen to block. The only data that leaves the device is
+anonymous Crashlytics reports for stability monitoring; user content stays
+local. Accessibility access is the only practical way to reliably interrupt
+an app launch in time to be useful — the alternative (`UsageStatsManager`
+polling) introduces a 2-second lag during which the engagement loop has
+already begun, defeating the user's stated goal.
 
 ## Long version (in-app disclosure & developer-response template)
 
 ### Who GoNull is for
 
-GoNull is a digital-wellbeing tool aimed at users who struggle with
-self-regulation around specific apps — most commonly social media, video,
-news, and gambling apps. Our target users include people with:
+GoNull is a digital-wellbeing tool aimed at users who want help putting their
+phone down. The target audience is people who:
 
-- ADHD, where impulsive task-switching to a high-stimulation app derails work or sleep.
-- Executive-function challenges (autism spectrum, traumatic brain injury, etc.) where the gap between intention and behavior is large.
-- Digital impulse-control disorders, often co-occurring with anxiety or depression.
+- Lose hours to short-form video and feed-based apps without meaning to.
+- Have tried "willpower-only" blockers and bounced.
+- Want stronger commitment mechanisms than the OS-level Digital Wellbeing
+  controls offer (timers without enforcement, app limits the user can
+  override in one tap).
 
-These users have repeatedly expressed in research (e.g., the work of Adam
-Alter, Cal Newport, and clinical literature on internet-use disorder) that
+These users have repeatedly expressed in research and product reviews that
 **friction at the moment of impulse** is more effective than retrospective
-willpower. That moment-of-impulse intervention is exactly what the
-Accessibility Service enables.
+willpower or post-hoc usage reports. That moment-of-impulse intervention is
+exactly what the Accessibility Service enables.
 
 ### What GoNull does with the Accessibility API
 
@@ -77,12 +76,12 @@ flags set.
 ### What we collect and where it goes
 
 - **Inspected:** the foreground `packageName` field, in memory only.
-- **Logged:** when a user-blocked app is intercepted, GoNull writes a single
-  row to its local database recording the package and the timestamp. This is
-  used to power the "Today" stats card in-app.
-- **Transmitted:** nothing. GoNull does not declare `INTERNET` and contains
-  no networking code, analytics SDKs, advertising IDs, or third-party
-  trackers.
+- **Logged locally:** when a user-blocked app is intercepted, GoNull writes a
+  single row to its on-device database recording the package and the
+  timestamp. This powers the "Today" stats card.
+- **Transmitted:** anonymous crash reports via Firebase Crashlytics (stack
+  trace, device model, OS version, app version, random install ID). No user
+  content, no installed-app list, no usage data, no personal identifiers.
 - **Retention:** the local database is wiped on uninstall. Users can clear
   individual entries from inside the app.
 
@@ -92,15 +91,12 @@ We support both approaches and ship them as a hybrid. We default to the
 Accessibility approach because it is the only Android API that allows us to
 **block at the moment the user opens the app**, which is the entire user
 benefit. `UsageStatsManager` polling can only tell us *after the fact* that
-the user has been in the foreground app for 2+ seconds — by which point a
-single dopamine cycle has already played, and our intervention is too late
-to be therapeutic. Users with ADHD or impulse-control disorders are
-particularly sensitive to this lag; clinical literature on
-exposure-and-response prevention shows that delaying the response to a
-trigger is what builds tolerance.
+the user has been in the foreground app for 2+ seconds — by which point the
+engagement cycle has already started, and the friction barrier is too late
+to be useful.
 
-For users who are uncomfortable granting Accessibility Service access —
-or whose enterprise/MDM policies prohibit it — GoNull falls back to a
+For users who would rather not grant Accessibility Service access — or whose
+enterprise/MDM policies prohibit it — GoNull falls back to a
 `UsageStatsManager` polling service. The fallback is functional but the
 2-second lag is documented in onboarding as a degraded experience, not the
 default.
@@ -120,13 +116,13 @@ default.
 
 ### Privacy & compliance commitments
 
-- We do not sell or share any data; there is none to sell or share.
-- We do not embed third-party SDKs that have separate data flows. Accompanist
-  and Coil ship code only; they make no network calls of their own. ExoPlayer
-  is used solely to play a bundled local onboarding video file
-  (`res/raw/onboarding.mp4`).
-- Our privacy policy is in `legal/PRIVACY_POLICY.md` and will be hosted at
-  `[POLICY URL]` before submission.
+- We do not sell or share any data.
+- We do not embed third-party SDKs that have separate data flows beyond the
+  disclosed Crashlytics. Accompanist and Coil ship code only; they make no
+  network calls of their own. ExoPlayer is used solely to play a bundled
+  local onboarding video file (`res/raw/onboarding.mp4`).
+- Our privacy policy is at `gonull.app/privacy` (and in-repo at
+  `legal/PRIVACY_POLICY.md`).
 
 ### If the reviewer believes Accessibility is not justified
 
@@ -144,6 +140,6 @@ re-engineering effort.
 
 ### Contact
 
-For policy-review questions: `[CONTACT EMAIL]`.
+For policy-review questions: `infinitydata.ai@gmail.com`.
 For demo access: a sample APK and a 30-second screen-record demonstrating the
 Accessibility flow from grant to block-and-unblock is available on request.
