@@ -13,7 +13,7 @@ storage owned by the app. You control it; uninstalling the app deletes it.
 
 ## Who we are
 
-GoNull is published by `Chaithanya Ravulu` ("we", "us"). You can reach us at
+GoNull is published by the GoNull team ("we", "us"). You can reach us at
 `infinitydata.ai@gmail.com` for any privacy question.
 
 ## What GoNull accesses on your device
@@ -116,6 +116,6 @@ in-app before the new version takes effect.
 
 ## Contact
 
-`Chaithanya Ravulu`
+The GoNull team
 `infinitydata.ai@gmail.com`
 `United States`
