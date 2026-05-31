@@ -140,6 +140,6 @@ re-engineering effort.
 
 ### Contact
 
-For policy-review questions: `infinitydata.ai@gmail.com`.
+For policy-review questions: `hello@gonull.app`.
 For demo access: a sample APK and a 30-second screen-record demonstrating the
 Accessibility flow from grant to block-and-unblock is available on request.

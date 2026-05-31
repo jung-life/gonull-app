@@ -2,8 +2,6 @@
 
 **Last updated:** April 26, 2026
 
-> Replace `[YOUR LEGAL NAME]`, `[CONTACT EMAIL]`, and `[JURISDICTION]` before publishing.
-
 ## Summary
 
 GoNull is an on-device app blocker. It does **not** transmit your data over the
@@ -14,7 +12,7 @@ storage owned by the app. You control it; uninstalling the app deletes it.
 ## Who we are
 
 GoNull is published by the GoNull team ("we", "us"). You can reach us at
-`infinitydata.ai@gmail.com` for any privacy question.
+`hello@gonull.app` for any privacy question.
 
 ## What GoNull accesses on your device
 
@@ -85,7 +83,7 @@ purchase if applicable) are subject to Google's standard privacy practices:
 <https://firebase.google.com/support/privacy>. We do not log custom events
 that contain personal content from inside the app.
 
-If you would prefer GoNull never report crashes, contact `infinitydata.ai@gmail.com`
+If you would prefer GoNull never report crashes, contact `hello@gonull.app`
 and we will provide a build with Crashlytics removed, or add an in-app opt-out
 in a future release if there is demand.
 
@@ -101,7 +99,7 @@ Because all GoNull data is on your device:
 
 - **Access:** open the app — every record is visible in the corresponding screen (Stats, Journal, Settings).
 - **Deletion:** uninstall the app, or use the per-feature delete actions inside the app.
-- **Portability:** we currently do not provide an export function. If you need one, contact `infinitydata.ai@gmail.com` and we will prioritize it.
+- **Portability:** we currently do not provide an export function. If you need one, contact `hello@gonull.app` and we will prioritize it.
 
 If you live in a jurisdiction with GDPR, CCPA, or similar protections, you also
 have the right to lodge a complaint with your local data-protection authority.
@@ -117,5 +115,5 @@ in-app before the new version takes effect.
 ## Contact
 
 The GoNull team
-`infinitydata.ai@gmail.com`
+`hello@gonull.app`
 `United States`
