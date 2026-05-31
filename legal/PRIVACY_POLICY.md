@@ -54,12 +54,12 @@ GoNull deletes the entire database.
 - **No clipboard, camera, microphone, contacts, location, or SMS** access.
 - **No personally identifiable account data** (no email, name, phone, sign-in tokens) leaves your device.
 
-## Crashlytics & Firebase Analytics
+## Crashlytics
 
-GoNull bundles **Firebase Crashlytics** (for stability monitoring) and the
-**Firebase Analytics SDK** (a runtime dependency Crashlytics relies on). These
-are the only third-party SDKs in the app and the only reason GoNull contacts
-the internet at all.
+GoNull bundles **Firebase Crashlytics** for stability monitoring. It is the only
+third-party SDK in the app and the only reason GoNull contacts the internet at
+all. GoNull does **not** include the Firebase Analytics SDK or any advertising,
+tracking, or marketing SDK.
 
 What is sent off-device, and only when a crash or fatal error occurs:
 
@@ -78,10 +78,8 @@ What is **not** sent:
 - Usage statistics, streaks, focus-mode history, or accountability-partner
   contact info.
 
-Firebase Analytics' general default events (app open, screen view, in-app
-purchase if applicable) are subject to Google's standard privacy practices:
-<https://firebase.google.com/support/privacy>. We do not log custom events
-that contain personal content from inside the app.
+The crash data above is processed by Google as our data processor, subject to
+Google's privacy practices: <https://firebase.google.com/support/privacy>.
 
 If you would prefer GoNull never report crashes, contact `hello@gonull.app`
 and we will provide a build with Crashlytics removed, or add an in-app opt-out

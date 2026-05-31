@@ -147,10 +147,11 @@ dependencies {
 
     // Firebase Crashlytics — runtime deps only added when google-services.json exists,
     // since FirebaseApp init crashes at startup without configuration.
+    // Analytics SDK intentionally NOT included: Crashlytics works without it, and
+    // omitting it keeps GoNull's Play Data Safety footprint to crash logs only.
     if (hasFirebaseConfig) {
         implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
         implementation("com.google.firebase:firebase-crashlytics")
-        implementation("com.google.firebase:firebase-analytics")
     }
 
     // Testing
