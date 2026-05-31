@@ -281,34 +281,8 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
         ) {
-            // The 20-Second Rule
-            ProtocolCard(
-                number = "01",
-                title = "The 20-Second Rule",
-                description = "Your rational brain needs 20+ seconds to override impulse. Hard friction buys that time."
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Dopamine Deficit
-            ProtocolCard(
-                number = "02",
-                title = "The Deficit State",
-                description = "Endless scrolling downregulates your dopamine receptors. The only fix is letting your brain recalibrate."
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // 30-Day Reset
-            ProtocolCard(
-                number = "03",
-                title = "The 30-Day Reset",
-                description = "It takes ~30 days for receptors to reset. Slipping doesn't erase progress—it just pauses recovery."
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Privacy Note
+            // Prominent disclosure: shown first so users see the Accessibility
+            // Service explanation before reaching the permission-enable step.
             Card(
                 colors = CardDefaults.cardColors(
                     containerColor = GoNullSurface
@@ -348,6 +322,33 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
                     )
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // The 20-Second Rule
+            ProtocolCard(
+                number = "01",
+                title = "The 20-Second Rule",
+                description = "Your rational brain needs 20+ seconds to override impulse. Hard friction buys that time."
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Dopamine Deficit
+            ProtocolCard(
+                number = "02",
+                title = "The Deficit State",
+                description = "Endless scrolling downregulates your dopamine receptors. The only fix is letting your brain recalibrate."
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // 30-Day Reset
+            ProtocolCard(
+                number = "03",
+                title = "The 30-Day Reset",
+                description = "It takes ~30 days for receptors to reset. Slipping doesn't erase progress—it just pauses recovery."
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
         }
