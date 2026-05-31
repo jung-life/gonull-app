@@ -5,8 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import android.view.accessibility.AccessibilityEvent
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UsageLogEntity
@@ -66,13 +66,12 @@ class AppBlockerService : AccessibilityService() {
         // Register broadcast receiver for cache invalidation
         val cacheFilter = IntentFilter(ACTION_INVALIDATE_CACHE)
         val focusFilter = IntentFilter(FocusModeManager.ACTION_FOCUS_MODE_CHANGED)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            registerReceiver(cacheInvalidationReceiver, cacheFilter, RECEIVER_NOT_EXPORTED)
-            registerReceiver(focusModeReceiver, focusFilter, RECEIVER_NOT_EXPORTED)
-        } else {
-            registerReceiver(cacheInvalidationReceiver, cacheFilter)
-            registerReceiver(focusModeReceiver, focusFilter)
-        }
+        ContextCompat.registerReceiver(
+            this, cacheInvalidationReceiver, cacheFilter, ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+        ContextCompat.registerReceiver(
+            this, focusModeReceiver, focusFilter, ContextCompat.RECEIVER_NOT_EXPORTED
+        )
 
         // Initialize caches
         serviceScope.launch {

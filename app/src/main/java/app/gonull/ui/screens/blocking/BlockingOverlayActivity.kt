@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -131,6 +132,11 @@ class BlockingOverlayActivity : ComponentActivity() {
                     onGoBack = { goHome() }
                 )
             }
+        }
+
+        // Back gesture/button never dismisses the block — it sends the user home.
+        onBackPressedDispatcher.addCallback(this) {
+            goHome()
         }
     }
 
@@ -286,10 +292,6 @@ class BlockingOverlayActivity : ComponentActivity() {
         finish()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        goHome()
-    }
 }
 
 enum class BypassStep {

@@ -3,7 +3,6 @@ package app.gonull.service
 import android.content.Context
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UsageLogEntity
-import app.gonull.util.Constants
 import app.gonull.util.DateHelper
 
 /**
@@ -34,33 +33,28 @@ class ProgressiveFrictionManager(context: Context) {
      * Returns the level (1-4) for the NEXT bypass
      */
     suspend fun getNextFrictionLevel(packageName: String): Int {
-        val currentCount = getBypassCountToday(packageName)
-        return minOf(currentCount + 1, Constants.Friction.LEVEL_4_LOCKED)
+        return FrictionRules.nextLevel(getBypassCountToday(packageName))
     }
 
     /**
      * Check if the app is locked for today (4+ bypasses)
      */
     suspend fun isLockedForToday(packageName: String): Boolean {
-        return getBypassCountToday(packageName) >= Constants.Friction.LEVEL_4_LOCKED - 1
+        return FrictionRules.isLockedForToday(getBypassCountToday(packageName))
     }
 
     /**
      * Get the wait time in minutes required for the current friction level
      */
     fun getWaitTimeMinutes(frictionLevel: Int): Int {
-        return when (frictionLevel) {
-            Constants.Friction.LEVEL_2_BYPASS -> Constants.Friction.LEVEL_2_WAIT_MINUTES
-            Constants.Friction.LEVEL_3_BYPASS -> Constants.Friction.LEVEL_3_WAIT_MINUTES
-            else -> 0
-        }
+        return FrictionRules.waitTimeMinutes(frictionLevel)
     }
 
     /**
      * Check if reflection is required for the current friction level
      */
     fun isReflectionRequired(frictionLevel: Int): Boolean {
-        return frictionLevel == Constants.Friction.LEVEL_3_BYPASS
+        return FrictionRules.isReflectionRequired(frictionLevel)
     }
 
     /**
@@ -106,13 +100,7 @@ class ProgressiveFrictionManager(context: Context) {
      * Get the description for the current friction level
      */
     fun getFrictionDescription(frictionLevel: Int): String {
-        return when (frictionLevel) {
-            Constants.Friction.LEVEL_1_BYPASS -> "Complete verification to access"
-            Constants.Friction.LEVEL_2_BYPASS -> "Complete verification + ${Constants.Friction.LEVEL_2_WAIT_MINUTES} minute wait"
-            Constants.Friction.LEVEL_3_BYPASS -> "Complete verification + ${Constants.Friction.LEVEL_3_WAIT_MINUTES} minute wait + reflection"
-            Constants.Friction.LEVEL_4_LOCKED -> "Locked until tomorrow"
-            else -> "Access denied"
-        }
+        return FrictionRules.description(frictionLevel)
     }
 
     /**

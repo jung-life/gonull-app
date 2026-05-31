@@ -3,6 +3,7 @@ package app.gonull.ui.screens.reflection
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import androidx.lifecycle.lifecycleScope
 import app.gonull.data.local.AppDatabase
@@ -55,11 +56,11 @@ class PostSessionReflectionActivity : ComponentActivity() {
                 )
             }
         }
-    }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        finish()
+        // Back gesture/button skips the reflection.
+        onBackPressedDispatcher.addCallback(this) {
+            finish()
+        }
     }
 
     companion object {

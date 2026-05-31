@@ -3,6 +3,7 @@ package app.gonull.ui.screens.warning
 import android.content.pm.PackageManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.addCallback
 import androidx.activity.compose.setContent
 import app.gonull.service.AccessExpirationService
 import app.gonull.ui.components.AccessExpiringWarning
@@ -43,16 +44,11 @@ class AccessWarningActivity : ComponentActivity() {
                 )
             }
         }
-    }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        // Prevent dismissing with back button - user must acknowledge
-        // Or allow it but mark as dismissed
-        val packageName = intent.getStringExtra(AccessExpirationService.EXTRA_PACKAGE_NAME)
-        packageName?.let {
-            AccessExpirationService.dismissWarning(applicationContext, it)
+        // Back gesture/button dismisses the warning the same as the dismiss action.
+        onBackPressedDispatcher.addCallback(this) {
+            AccessExpirationService.dismissWarning(applicationContext, packageName)
+            finish()
         }
-        finish()
     }
 }
