@@ -317,7 +317,7 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "PRIVACY",
+                        text = "ACCESSIBILITY SERVICE",
                         style = MaterialTheme.typography.labelSmall.copy(
                             letterSpacing = 2.sp
                         ),
@@ -328,7 +328,20 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = "GoNull detects when you open blocked apps—nothing else. No screen content, no passwords, no data sent anywhere. Everything stays on your device.",
+                        text = "GoNull uses Android's Accessibility Service to detect when you open an " +
+                            "app you've chosen to block, so it can show the blocking screen. That is " +
+                            "the only thing GoNull does with this permission.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GoNullWhite,
+                        lineHeight = 20.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Text(
+                        text = "It does not read the content of your screen, what you type, your " +
+                            "passwords, or any other app. No personal or sensitive data is collected " +
+                            "or shared — everything stays on your device.",
                         style = MaterialTheme.typography.bodySmall,
                         color = GoNullGray,
                         lineHeight = 20.sp
