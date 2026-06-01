@@ -24,6 +24,26 @@ val hasReleaseKeystore = keystoreProperties.getProperty("storeFile")?.let {
     rootProject.file(it).exists()
 } ?: false
 
+// Auto-incrementing versionCode derived from the git commit count, so every commit
+// produces a strictly higher code than the last (Play requires monotonic codes and
+// permanently burns any code that was ever uploaded). Falls back to
+// FALLBACK_VERSION_CODE when git is unavailable (e.g. a source-tarball build); the
+// floor also guards against shallow clones reporting an artificially low count.
+val FALLBACK_VERSION_CODE = 34
+fun gitVersionCode(): Int {
+    return try {
+        val process = ProcessBuilder("git", "rev-list", "--count", "HEAD")
+            .directory(rootDir)
+            .redirectErrorStream(true)
+            .start()
+        val output = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        process.waitFor()
+        (output.toIntOrNull() ?: FALLBACK_VERSION_CODE).coerceAtLeast(FALLBACK_VERSION_CODE)
+    } catch (e: Exception) {
+        FALLBACK_VERSION_CODE
+    }
+}
+
 android {
     namespace = "app.gonull"
     compileSdk = 35
@@ -32,7 +52,7 @@ android {
         applicationId = "app.gonull"
         minSdk = 26
         targetSdk = 35
-        versionCode = 6
+        versionCode = gitVersionCode()
         versionName = "1.0.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
