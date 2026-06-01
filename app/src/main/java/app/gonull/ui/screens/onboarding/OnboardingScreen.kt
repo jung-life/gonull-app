@@ -53,7 +53,12 @@ fun OnboardingScreen(
             onSkip = { currentPage = 1 }
         )
         1 -> WelcomePage(onNext = { currentPage = 2 })
-        2 -> AccessibilityDisclosurePage(onNext = { currentPage = 3 })
+        2 -> AccessibilityDisclosurePage(
+            onConsent = { currentPage = 3 },
+            // Decline: return to the previous screen without enabling the service.
+            // The user can advance again to re-trigger this disclosure.
+            onDecline = { currentPage = 1 }
+        )
         3 -> PermissionsPage(
             accessibilityEnabled = accessibilityEnabled,
             overlayEnabled = overlayEnabled,
@@ -245,7 +250,10 @@ fun WelcomePage(onNext: () -> Unit) {
 }
 
 @Composable
-fun AccessibilityDisclosurePage(onNext: () -> Unit) {
+fun AccessibilityDisclosurePage(
+    onConsent: () -> Unit,
+    onDecline: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -353,19 +361,44 @@ fun AccessibilityDisclosurePage(onNext: () -> Unit) {
             Spacer(modifier = Modifier.height(24.dp))
         }
 
-        // CTA Button
+        // Affirmative-consent statement (required for the Accessibility disclosure).
+        Text(
+            text = "By tapping \"I Agree\", you consent to GoNull using the Accessibility " +
+                "Service for the purpose described above.",
+            style = MaterialTheme.typography.bodySmall,
+            color = GoNullGray,
+            lineHeight = 18.sp
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Consent: affirmative action that advances to enabling the service.
         Button(
-            onClick = onNext,
+            onClick = onConsent,
             colors = ButtonDefaults.buttonColors(
                 containerColor = GoNullGreen,
                 contentColor = GoNullBlack
             ),
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("Set Up Permissions", fontWeight = FontWeight.Bold)
+            Text("I Agree — Continue", fontWeight = FontWeight.Bold)
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // Decline: user does not consent; blocking is not enabled.
+        TextButton(
+            onClick = onDecline,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "Not now",
+                color = GoNullGray,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
 
         PrivacyPolicyLink()
 
