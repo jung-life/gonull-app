@@ -36,3 +36,6 @@ google-services.json
 
 # Large screen-recording videos (host externally, do not commit)
 play-store-assets/video/
+
+# macOS folder metadata
+.DS_Store
