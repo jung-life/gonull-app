@@ -33,3 +33,6 @@ google-services.json
 
 # Android Profiling
 *.hprof
+
+# Large screen-recording videos (host externally, do not commit)
+play-store-assets/video/
