@@ -1,7 +1,9 @@
 package app.gonull.ui.screens.onboarding
 
+import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -25,6 +27,9 @@ import app.gonull.ui.components.VideoPlayer
 import app.gonull.ui.theme.*
 import app.gonull.util.Constants
 import app.gonull.util.PermissionHelper
+import com.google.accompanist.permissions.ExperimentalPermissionsApi
+import com.google.accompanist.permissions.isGranted
+import com.google.accompanist.permissions.rememberPermissionState
 
 @Composable
 fun OnboardingScreen(
@@ -486,7 +491,7 @@ fun BulletPoint(text: String) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun PermissionsPage(
     accessibilityEnabled: Boolean,
@@ -496,7 +501,16 @@ fun PermissionsPage(
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
-    val allRequiredGranted = accessibilityEnabled && overlayEnabled && usageStatsEnabled
+
+    // POST_NOTIFICATIONS is a runtime permission on Android 13+. Without it, the
+    // unlock-timer countdown and session-expiry warnings are silently hidden.
+    val needsNotificationPermission = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+    val notificationPermissionState =
+        if (needsNotificationPermission) rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS) else null
+    val notificationsGranted = notificationPermissionState?.status?.isGranted ?: true
+
+    val allRequiredGranted =
+        accessibilityEnabled && overlayEnabled && usageStatsEnabled && notificationsGranted
     var isPreloading by remember { mutableStateOf(false) }
     var preloadComplete by remember { mutableStateOf(false) }
 
@@ -580,6 +594,18 @@ fun PermissionsPage(
                 isGranted = usageStatsEnabled,
                 onClick = { PermissionHelper.openUsageStatsSettings(context) }
             )
+
+            if (needsNotificationPermission) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PermissionCard(
+                    title = "Notifications",
+                    description = "Shows unlock timers and session warnings",
+                    requirement = "REQUIRED",
+                    isGranted = notificationsGranted,
+                    onClick = { notificationPermissionState?.launchPermissionRequest() }
+                )
+            }
 
             Spacer(modifier = Modifier.height(12.dp))
 
