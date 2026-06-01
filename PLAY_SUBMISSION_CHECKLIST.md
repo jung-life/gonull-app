@@ -7,7 +7,8 @@ Play Console. Track: **Internal testing** first.
 - **Version:** code auto-derived from git commit count (currently 35), name `1.0.5`
 - **AAB:** `app/build/outputs/bundle/release/app-release.aab` (rebuild with `./gradlew :app:bundleRelease` after committing)
 - **Privacy policy (LIVE):** https://gonull.app/privacy
-- **Disclosure video:** https://www.youtube.com/watch?v=wOHIq2baar0 (set to Unlisted)
+- **Accessibility disclosure video:** https://www.youtube.com/watch?v=wOHIq2baar0 (Unlisted)
+- **QUERY_ALL_PACKAGES video:** https://www.youtube.com/watch?v=eH2r9CnSx00 (Unlisted)
 
 ---
 
@@ -90,16 +91,24 @@ Collected **Yes** · Shared **No** · Ephemeral **No** · Required **Yes** · En
 
 ## 5. Permission declarations
 
-- **`QUERY_ALL_PACKAGES`:**
-  > "GoNull is a device-utility app blocker. It needs the list of installed apps so
-  > users can choose which apps to block from the App Selection screen. App names
-  > and icons are read on-device via PackageManager and never transmitted."
-- **`FOREGROUND_SERVICE_SPECIAL_USE`** (if prompted):
-  > "Special-use foreground services run the unlock countdown timer, monitor active
-  > access sessions for the expiry warning, and (optionally) run the usage-stats
-  > polling fallback blocker — all user-facing, ongoing tasks that must continue
-  > while the user is in other apps."
-- **AccessibilityServices:** see section 2.
+### `QUERY_ALL_PACKAGES` (its own form: core purpose + usage + video)
+- **Core purpose (≤500 chars):**
+  > "GoNull is an app blocker. Its core feature is the App Selection screen, where
+  > users browse the full list of installed apps and choose which ones to block.
+  > Displaying every installed app — so users can find and select any one,
+  > including apps GoNull does not pre-list — requires querying all packages. App
+  > names and icons are read on-device via PackageManager and never leave the device."
+- **Usage:** [x] App functionality only (all others unchecked)
+- **Video:** `https://www.youtube.com/watch?v=eH2r9CnSx00`
+
+### `FOREGROUND_SERVICE_SPECIAL_USE` (if prompted)
+> "Special-use foreground services run the unlock countdown timer, monitor active
+> access sessions for the expiry warning, and (optionally) run the usage-stats
+> polling fallback blocker — all user-facing, ongoing tasks that must continue
+> while the user is in other apps."
+
+### AccessibilityServices
+See section 2 (App functionality / No sensitive data / video).
 
 ---
 
