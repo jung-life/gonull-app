@@ -9,6 +9,7 @@ Play Console. Track: **Internal testing** first.
 - **Privacy policy (LIVE):** https://gonull.app/privacy
 - **Accessibility disclosure video:** https://www.youtube.com/watch?v=wOHIq2baar0 (Unlisted)
 - **QUERY_ALL_PACKAGES video:** https://www.youtube.com/watch?v=eH2r9CnSx00 (Unlisted)
+- **FOREGROUND_SERVICE_SPECIAL_USE video:** https://www.youtube.com/watch?v=1WZ2RIqHQb8 (Unlisted)
 
 ---
 
@@ -101,11 +102,21 @@ Collected **Yes** · Shared **No** · Ephemeral **No** · Required **Yes** · En
 - **Usage:** [x] App functionality only (all others unchecked)
 - **Video:** `https://www.youtube.com/watch?v=eH2r9CnSx00`
 
-### `FOREGROUND_SERVICE_SPECIAL_USE` (if prompted)
-> "Special-use foreground services run the unlock countdown timer, monitor active
-> access sessions for the expiry warning, and (optionally) run the usage-stats
-> polling fallback blocker — all user-facing, ongoing tasks that must continue
-> while the user is in other apps."
+### `FOREGROUND_SERVICE_SPECIAL_USE`
+- **Tasks:** select **Other**
+- **Video:** `https://www.youtube.com/watch?v=1WZ2RIqHQb8`
+- **Describe permission use:**
+> "GoNull is an app blocker. It runs special-use foreground services for three
+> user-facing, time-critical tasks: (1) an unlock countdown timer that counts down
+> a user-set delay before a blocked app may be opened; (2) an active-session
+> monitor that warns the user 2 minutes before temporary access expires and
+> re-blocks the app when it does; and (3) an optional usage-stats polling service
+> that detects and blocks apps where the accessibility-based blocker is
+> unavailable. These must start the moment the user begins an unlock or access
+> session and run continuously, because pausing or restarting them would reset the
+> countdown or miss the exact moment an app is launched or a session expires —
+> defeating the commitment-contract that is the app's core purpose. Each service
+> shows its status to the user via a persistent notification."
 
 ### AccessibilityServices
 See section 2 (App functionality / No sensitive data / video).
