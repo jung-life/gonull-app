@@ -8,6 +8,7 @@ import android.content.IntentFilter
 import android.util.Log
 import androidx.core.content.ContextCompat
 import android.view.accessibility.AccessibilityEvent
+import android.view.inputmethod.InputMethodManager
 import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UsageLogEntity
 import app.gonull.ui.screens.blocking.BlockingOverlayActivity
@@ -37,6 +38,10 @@ class AppBlockerService : AccessibilityService() {
     private var isAnalogModeActive: Boolean = false
     private var analogWhitelistCache: Set<String> = emptySet()
 
+    // Input-method (keyboard) packages must NEVER be blocked, or the device
+    // becomes unusable. Captured once at startup across all installed IMEs.
+    private var protectedImePackages: Set<String> = emptySet()
+
     // Broadcast receiver for cache invalidation
     private val cacheInvalidationReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
@@ -62,6 +67,7 @@ class AppBlockerService : AccessibilityService() {
         super.onCreate()
         database = AppDatabase.getDatabase(applicationContext)
         focusModeManager = FocusModeManager.getInstance(applicationContext)
+        protectedImePackages = loadProtectedImePackages()
 
         // Register broadcast receiver for cache invalidation
         val cacheFilter = IntentFilter(ACTION_INVALIDATE_CACHE)
@@ -105,9 +111,11 @@ class AppBlockerService : AccessibilityService() {
 
         val packageName = event.packageName?.toString() ?: return
 
-        // Ignore our own app and system/launcher packages
+        // Ignore our own app, system/launcher packages, and keyboards. Blocking an
+        // input method would leave the user unable to type anywhere on the device.
         if (packageName == applicationContext.packageName) return
         if (isSystemOrLauncher(packageName)) return
+        if (protectedImePackages.contains(packageName)) return
 
         // ANALOG MODE: block everything except whitelist
         if (isAnalogModeActive) {
@@ -146,11 +154,15 @@ class AppBlockerService : AccessibilityService() {
     }
 
     private suspend fun updateBlockedAppsCache() {
-        blockedAppsCache = database.blockedAppDao()
-            .getActiveBlockedApps()
-            .first()
-            .map { it.packageName }
-            .toSet()
+        val active = database.blockedAppDao().getActiveBlockedApps().first()
+        // Defensively drop any never-blockable packages (keyboards, our own app) that
+        // may have been saved before they were filtered out of app selection.
+        val (neverBlockable, blockable) = active.partition { app ->
+            app.packageName == applicationContext.packageName ||
+                protectedImePackages.contains(app.packageName)
+        }
+        neverBlockable.forEach { database.blockedAppDao().deleteBlockedAppByPackage(it.packageName) }
+        blockedAppsCache = blockable.map { it.packageName }.toSet()
         lastCacheUpdate = System.currentTimeMillis()
         Log.d(TAG, "Cache updated with ${blockedAppsCache.size} blocked apps: $blockedAppsCache")
     }
@@ -227,6 +239,17 @@ class AppBlockerService : AccessibilityService() {
             Log.e(TAG, "Error unregistering receivers", e)
         }
         serviceScope.cancel()
+    }
+
+    /** All installed input-method (keyboard) packages — never blockable. */
+    private fun loadProtectedImePackages(): Set<String> {
+        return try {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.inputMethodList.mapNotNull { it.packageName }.toSet()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to load input-method packages", e)
+            emptySet()
+        }
     }
 
     private fun isSystemOrLauncher(packageName: String): Boolean {

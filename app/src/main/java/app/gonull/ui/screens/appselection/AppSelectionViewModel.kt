@@ -4,6 +4,7 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.view.inputmethod.InputMethodManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.gonull.data.local.AppDatabase
@@ -66,10 +67,21 @@ class AppSelectionViewModel(
 
         viewModelScope.launch {
             val packageManager = context.packageManager
-            
+
+            // Keyboards must never be blockable, and GoNull must not list itself.
+            val imePackages = try {
+                val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+                imm.inputMethodList.mapNotNull { it.packageName }.toSet()
+            } catch (e: Exception) {
+                emptySet()
+            }
+            val ownPackage = context.packageName
+
             val allApps = withContext(Dispatchers.IO) {
                 packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
                     .filter { app ->
+                        if (app.packageName == ownPackage) return@filter false
+                        if (imePackages.contains(app.packageName)) return@filter false
                         val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
                         val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
                         isUserApp || hasLauncher
