@@ -5,6 +5,7 @@ import android.app.AppOpsManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Process
 import android.provider.Settings
@@ -15,10 +16,20 @@ object PermissionHelper {
     fun isAccessibilityServiceEnabled(context: Context): Boolean {
         val am = context.getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
         val enabledServices = am.getEnabledAccessibilityServiceList(
-            AccessibilityServiceInfo.FEEDBACK_GENERIC
+            AccessibilityServiceInfo.FEEDBACK_ALL_MASK
         )
-        return enabledServices.any {
-            it.resolveInfo.serviceInfo.packageName == context.packageName
+        if (enabledServices.any { it.resolveInfo.serviceInfo.packageName == context.packageName }) {
+            return true
+        }
+        // Some OEMs don't report the service via AccessibilityManager right away;
+        // the secure setting is the source of truth.
+        val expected = ComponentName(context, "app.gonull.service.AppBlockerService")
+        val enabledSetting = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        return enabledSetting.split(':').any {
+            ComponentName.unflattenFromString(it) == expected
         }
     }
 
@@ -53,7 +64,14 @@ object PermissionHelper {
             Process.myUid(),
             context.packageName
         )
-        return mode == AppOpsManager.MODE_ALLOWED
+        // Many devices return MODE_DEFAULT after the user grants usage access;
+        // in that case the actual permission check decides.
+        return if (mode == AppOpsManager.MODE_DEFAULT) {
+            context.checkCallingOrSelfPermission(android.Manifest.permission.PACKAGE_USAGE_STATS) ==
+                PackageManager.PERMISSION_GRANTED
+        } else {
+            mode == AppOpsManager.MODE_ALLOWED
+        }
     }
 
     fun openUsageStatsSettings(context: Context) {
@@ -81,6 +99,14 @@ object PermissionHelper {
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
             Uri.parse("package:${context.packageName}")
         ).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    }
+
+    fun openNotificationSettings(context: Context) {
+        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+            putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         context.startActivity(intent)

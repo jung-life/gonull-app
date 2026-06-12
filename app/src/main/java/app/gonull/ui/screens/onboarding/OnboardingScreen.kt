@@ -14,6 +14,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -30,6 +31,7 @@ import app.gonull.util.PermissionHelper
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.shouldShowRationale
 
 @Composable
 fun OnboardingScreen(
@@ -509,6 +511,8 @@ fun PermissionsPage(
         if (needsNotificationPermission) rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS) else null
     val notificationsGranted = notificationPermissionState?.status?.isGranted ?: true
 
+    var notificationRequestLaunched by rememberSaveable { mutableStateOf(false) }
+
     val allRequiredGranted =
         accessibilityEnabled && overlayEnabled && usageStatsEnabled && notificationsGranted
     var isPreloading by remember { mutableStateOf(false) }
@@ -603,7 +607,19 @@ fun PermissionsPage(
                     description = "Shows unlock timers and session warnings",
                     requirement = "REQUIRED",
                     isGranted = notificationsGranted,
-                    onClick = { notificationPermissionState?.launchPermissionRequest() }
+                    onClick = {
+                        val status = notificationPermissionState?.status
+                        // Once the permission is permanently denied, launchPermissionRequest()
+                        // is a silent no-op — send the user to system settings instead.
+                        if (notificationRequestLaunched &&
+                            status != null && !status.isGranted && !status.shouldShowRationale
+                        ) {
+                            PermissionHelper.openNotificationSettings(context)
+                        } else {
+                            notificationRequestLaunched = true
+                            notificationPermissionState?.launchPermissionRequest()
+                        }
+                    }
                 )
             }
 
