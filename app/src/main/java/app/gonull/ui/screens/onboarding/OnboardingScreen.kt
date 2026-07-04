@@ -509,8 +509,14 @@ fun PermissionsPage(
         if (needsNotificationPermission) rememberPermissionState(Manifest.permission.POST_NOTIFICATIONS) else null
     val notificationsGranted = notificationPermissionState?.status?.isGranted ?: true
 
+    // Accessibility, Usage Stats, and Notifications are required.
+    // Display Over Apps is optional — if unavailable (OEM-disabled on some Vivo/Oppo
+    // devices), we'll fall back to UsageStatsBased blocking with a 2-second lag.
     val allRequiredGranted =
-        accessibilityEnabled && overlayEnabled && usageStatsEnabled && notificationsGranted
+        accessibilityEnabled && usageStatsEnabled && notificationsGranted
+    val missingCount =
+        listOf(accessibilityEnabled, usageStatsEnabled, notificationsGranted)
+            .count { !it }
     var isPreloading by remember { mutableStateOf(false) }
     var preloadComplete by remember { mutableStateOf(false) }
 
@@ -579,8 +585,8 @@ fun PermissionsPage(
 
             PermissionCard(
                 title = "Display Over Apps",
-                description = "Shows the blocking screen",
-                requirement = "REQUIRED",
+                description = "Shows the blocking screen instantly. On some devices this is unavailable — we'll use a slower fallback instead.",
+                requirement = "OPTIONAL",
                 isGranted = overlayEnabled,
                 onClick = { PermissionHelper.openOverlaySettings(context) }
             )
@@ -620,17 +626,30 @@ fun PermissionsPage(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
-        // Continue button
+        // Continue button. When permissions are still missing, this acts as a
+        // shortcut that opens the first ungranted permission rather than being a
+        // dead, disabled button (which reads as "broken" to users tapping it).
         Button(
-            onClick = onContinue,
-            enabled = allRequiredGranted && !isPreloading,
+            onClick = {
+                when {
+                    allRequiredGranted -> onContinue()
+                    !accessibilityEnabled -> PermissionHelper.openAccessibilitySettings(context)
+                    !usageStatsEnabled -> PermissionHelper.openUsageStatsSettings(context)
+                    !notificationsGranted -> notificationPermissionState?.launchPermissionRequest()
+                    // Overlay is optional — if user doesn't grant it, we use UsageStatsBased fallback
+                }
+            },
+            enabled = !isPreloading,
             colors = ButtonDefaults.buttonColors(
                 containerColor = GoNullGreen,
                 contentColor = GoNullBlack,
                 disabledContainerColor = GoNullSurface,
                 disabledContentColor = GoNullGray
             ),
-            modifier = Modifier.fillMaxWidth()
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 6.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
         ) {
             if (isPreloading) {
                 CircularProgressIndicator(
@@ -642,7 +661,11 @@ fun PermissionsPage(
                 Text("Preparing your journey...", fontWeight = FontWeight.Bold)
             } else {
                 Text(
-                    if (allRequiredGranted) "Let's Start Our Journey" else "Grant all permissions to continue",
+                    text = if (allRequiredGranted) {
+                        "Let's Start Our Journey"
+                    } else {
+                        "Set Up Next Permission ($missingCount left)"
+                    },
                     fontWeight = FontWeight.Bold
                 )
             }

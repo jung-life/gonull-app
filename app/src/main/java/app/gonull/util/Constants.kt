@@ -9,6 +9,11 @@ object Constants {
     const val DEFAULT_UNLOCK_DELAY_MINUTES = 30
     const val DEFAULT_ACCESS_DURATION_MINUTES = 15
 
+    // Removal cooldown (Lock Mode): friction before the app can be uninstalled.
+    // This is a deliberate speed bump, not a hard block — the user can always
+    // cancel it, and can still remove Device Admin manually in system settings.
+    const val REMOVAL_COOLDOWN_MINUTES = 10
+
     // Unlock delay options (minutes)
     val UNLOCK_DELAY_OPTIONS = listOf(15, 30, 60, 120, 240, 480, 1440)
 

@@ -132,7 +132,7 @@
             android:name=".receiver.AlarmReceiver"
             android:exported="false" />
 
-        <!-- Device Admin Receiver (for Lock Mode / Anti-Uninstall) -->
+        <!-- Device Admin Receiver (for Lock Mode / removal cooldown) -->
         <receiver
             android:name=".receiver.GoNullDeviceAdminReceiver"
             android:exported="true"

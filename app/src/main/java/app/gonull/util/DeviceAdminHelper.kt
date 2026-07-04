@@ -8,7 +8,8 @@ import app.gonull.receiver.GoNullDeviceAdminReceiver
 
 /**
  * Helper class for managing Device Admin features.
- * Used for "Lock Mode" which prevents app uninstallation during blocking sessions.
+ * Used for "Lock Mode", which routes app removal through a cooldown (a speed
+ * bump, not a hard block) rather than truly preventing uninstallation.
  */
 object DeviceAdminHelper {
 
@@ -31,8 +32,8 @@ object DeviceAdminHelper {
             putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, componentName)
             putExtra(
                 DevicePolicyManager.EXTRA_ADD_EXPLANATION,
-                "Enable Lock Mode to prevent uninstalling GoNull during active block sessions. " +
-                        "This helps maintain your commitment. You can disable this after your session ends."
+                "Enable Lock Mode so removing GoNull goes through a short cooldown instead of an " +
+                        "impulse tap. You can cancel the cooldown, and you can turn this off anytime."
             )
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
@@ -58,6 +59,22 @@ object DeviceAdminHelper {
      */
     fun openDeviceAdminSettings(context: Context) {
         val intent = Intent(android.provider.Settings.ACTION_SECURITY_SETTINGS).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    }
+
+    /**
+     * Deactivate Lock Mode (if active) and launch the system uninstaller for
+     * GoNull. Device Admin must be removed first, otherwise the OS blocks the
+     * uninstall. Called once the removal cooldown has elapsed.
+     */
+    fun startUninstall(context: Context) {
+        removeDeviceAdmin(context)
+        val intent = Intent(
+            Intent.ACTION_DELETE,
+            android.net.Uri.parse("package:${context.packageName}")
+        ).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK
         }
         context.startActivity(intent)

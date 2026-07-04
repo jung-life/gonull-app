@@ -32,7 +32,12 @@ const IntroScene: React.FC = () => {
     extrapolateRight: "clamp",
   });
 
-  const textOpacity = interpolate(frame, [20, 40], [0, 1], {
+  const textOpacity = interpolate(frame, [20, 36], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  // Second line fades in after the headline so they appear one after another.
+  const subtitleOpacity = interpolate(frame, [42, 58], [0, 1], {
     extrapolateRight: "clamp",
   });
 
@@ -76,8 +81,22 @@ const IntroScene: React.FC = () => {
             fontFamily: "system-ui, sans-serif",
           }}
         >
-          How much time did you lose today?
+          How many times did you lose focus today?
         </h1>
+
+        <p
+          style={{
+            color: colors.gray,
+            fontSize: 38,
+            marginBottom: 30,
+            opacity: subtitleOpacity,
+            fontFamily: "system-ui, sans-serif",
+          }}
+        >
+          Don't feel bad about it — the apps are
+          <br />
+          designed to make you do that.
+        </p>
 
         <div
           style={{

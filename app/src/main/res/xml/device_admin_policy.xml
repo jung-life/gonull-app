@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <device-admin xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-policies>
-        <!-- This allows the app to prevent uninstallation -->
+        <!-- An active device admin makes uninstall require deactivation first;
+             that's the speed bump Lock Mode relies on. No password policy is
+             enforced — limit-password is declared only to register the admin. -->
         <limit-password />
     </uses-policies>
 </device-admin>

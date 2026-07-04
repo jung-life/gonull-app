@@ -6,12 +6,11 @@ import android.content.Intent
 import android.widget.Toast
 
 /**
- * Device Admin receiver for anti-uninstall protection.
+ * Device Admin receiver for Lock Mode.
  *
- * When enabled, this prevents the user from uninstalling the app during
- * an active blocking session, providing stronger commitment enforcement.
- *
- * Users can disable Device Admin in Settings after their block session ends.
+ * While active, removing GoNull goes through a cooldown instead of an impulse
+ * tap — a deliberate speed bump, not a hard block. The user can cancel the
+ * cooldown, and can always disable Device Admin in system settings.
  */
 class GoNullDeviceAdminReceiver : DeviceAdminReceiver() {
 
@@ -19,7 +18,7 @@ class GoNullDeviceAdminReceiver : DeviceAdminReceiver() {
         super.onEnabled(context, intent)
         Toast.makeText(
             context,
-            "GoNull Lock Mode enabled - App cannot be uninstalled during block sessions",
+            "Lock Mode on — removing GoNull now goes through a cooldown",
             Toast.LENGTH_LONG
         ).show()
     }
@@ -28,12 +27,12 @@ class GoNullDeviceAdminReceiver : DeviceAdminReceiver() {
         super.onDisabled(context, intent)
         Toast.makeText(
             context,
-            "GoNull Lock Mode disabled",
+            "Lock Mode off",
             Toast.LENGTH_SHORT
         ).show()
     }
 
     override fun onDisableRequested(context: Context, intent: Intent): CharSequence {
-        return "Disabling Lock Mode will allow you to uninstall GoNull during active blocks. Are you sure?"
+        return "Turning off Lock Mode removes the removal cooldown, so you can uninstall GoNull right away. Continue?"
     }
 }

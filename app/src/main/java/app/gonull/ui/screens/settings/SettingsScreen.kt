@@ -267,7 +267,7 @@ fun SettingsScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
-                    "Lock Mode (Anti-Uninstall)",
+                    "Lock Mode (Removal Cooldown)",
                     style = MaterialTheme.typography.titleMedium,
                     color = GoNullGray,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -345,16 +345,38 @@ fun SettingsScreen(
 @Composable
 fun LockModeCard() {
     val context = LocalContext.current
-    var isLockModeEnabled by remember { mutableStateOf(DeviceAdminHelper.isDeviceAdminEnabled(context)) }
-    var showConfirmDialog by remember { mutableStateOf(false) }
 
-    // Check device admin status periodically
+    var isLockModeEnabled by remember { mutableStateOf(DeviceAdminHelper.isDeviceAdminEnabled(context)) }
+    var removalRequestedAt by remember { mutableStateOf(PreferenceHelper.getRemovalRequestedAt(context)) }
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    var showEnableDialog by remember { mutableStateOf(false) }
+    var showCooldownDialog by remember { mutableStateOf(false) }
+
+    val cooldownMillis = Constants.REMOVAL_COOLDOWN_MINUTES * 60_000L
+
+    // Keep device-admin status, the pending removal request, and the clock in sync.
     LaunchedEffect(Unit) {
         while (true) {
             isLockModeEnabled = DeviceAdminHelper.isDeviceAdminEnabled(context)
+            removalRequestedAt = PreferenceHelper.getRemovalRequestedAt(context)
+            now = System.currentTimeMillis()
             kotlinx.coroutines.delay(1000)
         }
     }
+
+    // A pending removal only makes sense while Lock Mode is on; clear stale ones
+    // (e.g. if the user disabled Device Admin manually in system settings).
+    LaunchedEffect(isLockModeEnabled) {
+        if (!isLockModeEnabled && removalRequestedAt > 0L) {
+            PreferenceHelper.clearRemovalRequest(context)
+            removalRequestedAt = 0L
+        }
+    }
+
+    val cooldownActive = removalRequestedAt > 0L
+    val remainingMillis =
+        if (cooldownActive) (removalRequestedAt + cooldownMillis - now).coerceAtLeast(0L) else 0L
+    val cooldownReady = cooldownActive && remainingMillis == 0L
 
     Card(
         colors = CardDefaults.cardColors(
@@ -375,7 +397,12 @@ fun LockModeCard() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = if (isLockModeEnabled) "ACTIVE - App cannot be uninstalled" else "Inactive",
+                        text = when {
+                            !isLockModeEnabled -> "Inactive"
+                            cooldownReady -> "Cooldown complete — you can remove GoNull"
+                            cooldownActive -> "Turning off in ${formatCountdown(remainingMillis)}"
+                            else -> "Active — removal goes through a cooldown"
+                        },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isLockModeEnabled) GoNullRed else GoNullGray
                     )
@@ -383,12 +410,10 @@ fun LockModeCard() {
 
                 Switch(
                     checked = isLockModeEnabled,
+                    // Locked during a running cooldown — use the explicit buttons below.
+                    enabled = !cooldownActive,
                     onCheckedChange = {
-                        if (it) {
-                            showConfirmDialog = true
-                        } else {
-                            DeviceAdminHelper.openDeviceAdminSettings(context)
-                        }
+                        if (it) showEnableDialog = true else showCooldownDialog = true
                     },
                     colors = SwitchDefaults.colors(
                         checkedThumbColor = GoNullRed,
@@ -399,51 +424,128 @@ fun LockModeCard() {
 
             Spacer(modifier = Modifier.height(12.dp))
 
+            if (cooldownActive) {
+                if (cooldownReady) {
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        OutlinedButton(
+                            onClick = {
+                                DeviceAdminHelper.removeDeviceAdmin(context)
+                                PreferenceHelper.clearRemovalRequest(context)
+                                removalRequestedAt = 0L
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Turn Off Lock Mode", color = GoNullGray)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = {
+                                PreferenceHelper.clearRemovalRequest(context)
+                                DeviceAdminHelper.startUninstall(context)
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = GoNullRed),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Remove GoNull", color = GoNullWhite)
+                        }
+                    }
+                } else {
+                    TextButton(
+                        onClick = {
+                            PreferenceHelper.clearRemovalRequest(context)
+                            removalRequestedAt = 0L
+                        }
+                    ) {
+                        Text("Cancel — keep GoNull locked", color = GoNullGreen)
+                    }
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
             Text(
-                text = "⚠️ When enabled, you cannot uninstall GoNull even if you try. " +
-                        "This prevents you from giving up during moments of weakness. " +
-                        "To disable, go to Settings > Security > Device Admins.",
+                text = "Lock Mode adds friction so you can't quit on impulse. While it's on, removing " +
+                        "GoNull starts a ${Constants.REMOVAL_COOLDOWN_MINUTES}-minute cooldown first. " +
+                        "It's a speed bump, not a hard lock — you can cancel anytime, and you can always " +
+                        "turn off Device Admin yourself in Settings > Security.",
                 style = MaterialTheme.typography.bodySmall,
                 color = GoNullGray
             )
         }
     }
 
-    if (showConfirmDialog) {
+    if (showEnableDialog) {
         AlertDialog(
-            onDismissRequest = { showConfirmDialog = false },
+            onDismissRequest = { showEnableDialog = false },
             containerColor = GoNullSurface,
-            title = {
-                Text("Enable Lock Mode?", color = GoNullWhite)
-            },
+            title = { Text("Enable Lock Mode?", color = GoNullWhite) },
             text = {
                 Column {
                     Text(
-                        "Lock Mode uses Device Admin privileges to prevent you from uninstalling GoNull during active block sessions.",
+                        "Lock Mode uses Device Admin so removing GoNull goes through a " +
+                                "${Constants.REMOVAL_COOLDOWN_MINUTES}-minute cooldown instead of an impulse tap.",
                         color = GoNullGray
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "This is a serious commitment tool. You'll need to manually disable Device Admin in Settings to remove the app.",
+                        "This is a commitment aid, not a trap — you can cancel the cooldown, and you can " +
+                                "always disable Device Admin yourself in system Settings.",
                         color = GoNullYellow
                     )
                 }
             },
             confirmButton = {
                 TextButton(onClick = {
-                    showConfirmDialog = false
+                    showEnableDialog = false
                     DeviceAdminHelper.requestDeviceAdmin(context)
                 }) {
                     Text("Enable Lock Mode", color = GoNullRed)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showConfirmDialog = false }) {
+                TextButton(onClick = { showEnableDialog = false }) {
                     Text("Cancel", color = GoNullGray)
                 }
             }
         )
     }
+
+    if (showCooldownDialog) {
+        AlertDialog(
+            onDismissRequest = { showCooldownDialog = false },
+            containerColor = GoNullSurface,
+            title = { Text("Start removal cooldown?", color = GoNullWhite) },
+            text = {
+                Text(
+                    "Turning off Lock Mode starts a ${Constants.REMOVAL_COOLDOWN_MINUTES}-minute cooldown. " +
+                            "When it ends you can remove GoNull or keep using it unlocked. " +
+                            "You can cancel the cooldown at any time.",
+                    color = GoNullGray
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCooldownDialog = false
+                    val timestamp = System.currentTimeMillis()
+                    PreferenceHelper.setRemovalRequestedAt(context, timestamp)
+                    removalRequestedAt = timestamp
+                }) {
+                    Text("Start Cooldown", color = GoNullRed)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCooldownDialog = false }) {
+                    Text("Keep Locked", color = GoNullGray)
+                }
+            }
+        )
+    }
+}
+
+private fun formatCountdown(millis: Long): String {
+    val totalSeconds = millis / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
 }
 
 @Composable

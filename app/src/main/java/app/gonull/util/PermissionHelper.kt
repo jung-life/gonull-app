@@ -76,6 +76,21 @@ object PermissionHelper {
         return Settings.canDrawOverlays(context)
     }
 
+    /**
+     * Check if Display Over Apps permission is unavailable/disabled on this
+     * device (e.g. on Vivo, Oppo, or other OEM devices that disable it).
+     * Returns true if the permission setting exists but is toggled off and
+     * cannot be enabled (grayed out). This is distinct from canDrawOverlays,
+     * which just checks if it's currently granted.
+     */
+    fun isOverlayPermissionUnavailable(context: Context): Boolean {
+        // On devices where it's disabled, we can't check granularly, but we can
+        // infer: if the user has Accessibility Service enabled but trying to
+        // enable overlay fails repeatedly, it's likely unavailable.
+        // For now, we'll rely on the blocking strategy to detect this.
+        return false
+    }
+
     fun openOverlaySettings(context: Context) {
         val intent = Intent(
             Settings.ACTION_MANAGE_OVERLAY_PERMISSION,

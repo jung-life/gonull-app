@@ -14,6 +14,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.compose.rememberNavController
 import app.gonull.data.AppDataCache
 import app.gonull.data.local.AppDatabase
+import app.gonull.service.BlockingStrategy
+import app.gonull.service.BlockingStrategyManager
 import app.gonull.ui.navigation.NavGraph
 import app.gonull.ui.navigation.Screen
 import app.gonull.ui.theme.GoNullTheme
@@ -50,12 +52,22 @@ fun MainContent(database: AppDatabase) {
     var hasAllPermissions by remember { mutableStateOf(false) }
     var hasCompletedSetup by remember { mutableStateOf(false) }
 
-    // Function to check all permissions
+    // Function to check all permissions. Display Over Apps is optional — if
+    // unavailable (OEM-disabled on some Vivo/Oppo devices), we fall back to
+    // UsageStatsBased blocking with a 2-second lag instead of instant.
     fun checkPermissions() {
-        hasAllPermissions = PermissionHelper.isAccessibilityServiceEnabled(context) &&
-                PermissionHelper.canDrawOverlays(context) &&
-                PermissionHelper.hasUsageStatsPermission(context)
+        val accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
+        val overlayEnabled = PermissionHelper.canDrawOverlays(context)
+        val usageStatsEnabled = PermissionHelper.hasUsageStatsPermission(context)
+
+        hasAllPermissions = accessibilityEnabled && usageStatsEnabled
         hasCompletedSetup = PreferenceHelper.isInitialSetupComplete(context)
+
+        // If permissions are met but overlay is missing, switch to UsageStatsBased
+        if (hasAllPermissions && !overlayEnabled) {
+            val strategyManager = BlockingStrategyManager(context)
+            strategyManager.setStrategy(BlockingStrategy.UsageStatsBased)
+        }
     }
 
     // Check permissions on every resume (when returning from settings)
