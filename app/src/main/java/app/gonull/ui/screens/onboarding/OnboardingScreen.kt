@@ -519,11 +519,16 @@ fun PermissionsPage(
             .count { !it }
     var isPreloading by remember { mutableStateOf(false) }
     var preloadComplete by remember { mutableStateOf(false) }
+    var showAllGrantedBriefly by remember { mutableStateOf(false) }
 
-    // Auto-preload apps when all permissions are granted
+    // Auto-preload apps when all permissions are granted, but show a brief
+    // confirmation (500ms) so user can see the final permission was granted
+    // before the screen navigates away. This prevents the "rush" feeling.
     LaunchedEffect(allRequiredGranted) {
         if (allRequiredGranted && !preloadComplete && !isPreloading) {
             isPreloading = true
+            showAllGrantedBriefly = true
+            kotlinx.coroutines.delay(500)  // Brief visual confirmation
             app.gonull.data.AppDataCache.preload(context)
             preloadComplete = true
             isPreloading = false
@@ -651,23 +656,36 @@ fun PermissionsPage(
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            if (isPreloading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = GoNullBlack,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Preparing your journey...", fontWeight = FontWeight.Bold)
-            } else {
-                Text(
-                    text = if (allRequiredGranted) {
-                        "Let's Start Our Journey"
-                    } else {
-                        "Set Up Next Permission ($missingCount left)"
-                    },
-                    fontWeight = FontWeight.Bold
-                )
+            when {
+                isPreloading -> {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = GoNullBlack,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Preparing your journey...", fontWeight = FontWeight.Bold)
+                }
+                showAllGrantedBriefly && allRequiredGranted -> {
+                    Icon(
+                        Icons.Default.Check,
+                        contentDescription = "All permissions granted",
+                        modifier = Modifier.size(24.dp),
+                        tint = GoNullBlack
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("All set! Loading...", fontWeight = FontWeight.Bold)
+                }
+                else -> {
+                    Text(
+                        text = if (allRequiredGranted) {
+                            "Let's Start Our Journey"
+                        } else {
+                            "Set Up Next Permission ($missingCount left)"
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
 
