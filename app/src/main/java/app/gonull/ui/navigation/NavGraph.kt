@@ -13,6 +13,7 @@ import app.gonull.ui.screens.appselection.AppSelectionViewModel
 import app.gonull.ui.screens.home.HomeScreen
 import app.gonull.ui.screens.home.HomeViewModel
 import app.gonull.ui.screens.onboarding.OnboardingScreen
+import app.gonull.ui.screens.scanning.ScanningScreen
 import app.gonull.ui.screens.intel.IntelScreen
 import app.gonull.ui.screens.settings.SettingsScreen
 import app.gonull.ui.screens.journal.JournalScreen
@@ -24,6 +25,7 @@ import app.gonull.util.PermissionHelper
 
 sealed class Screen(val route: String) {
     object Onboarding : Screen("onboarding")
+    object Scanning : Screen("scanning")
     object UsageInsights : Screen("usage_insights")
     object Home : Screen("home")
     object AppSelection : Screen("app_selection")
@@ -46,8 +48,18 @@ fun NavGraph(
         composable(Screen.Onboarding.route) {
             OnboardingScreen(
                 onComplete = {
-                    navController.navigate(Screen.UsageInsights.route) {
+                    navController.navigate(Screen.Scanning.route) {
                         popUpTo(Screen.Onboarding.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+
+        composable(Screen.Scanning.route) {
+            ScanningScreen(
+                onComplete = {
+                    navController.navigate(Screen.UsageInsights.route) {
+                        popUpTo(Screen.Scanning.route) { inclusive = true }
                     }
                 }
             )

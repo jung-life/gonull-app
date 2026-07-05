@@ -514,12 +514,9 @@ fun PermissionsPage(
     val missingCount =
         listOf(accessibilityEnabled, usageStatsEnabled, notificationsGranted)
             .count { !it }
-    var isPreloading by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
 
-    // Don't auto-navigate. User must click "Let's Start Our Journey" button
-    // after all permissions are granted. This gives them control and prevents
-    // the jarring "rush" to the next screen.
+    // Don't auto-navigate. The user must tap "Let's Start Our Journey" to proceed
+    // (to the scanning screen), which prevents the jarring "rush" to the next screen.
 
     Column(
         modifier = Modifier
@@ -623,24 +620,15 @@ fun PermissionsPage(
         Button(
             onClick = {
                 when {
-                    allRequiredGranted -> {
-                        // User clicked to proceed — preload and navigate
-                        isPreloading = true
-                        scope.launch {
-                            try {
-                                app.gonull.data.AppDataCache.preload(context)
-                            } finally {
-                                onContinue()
-                            }
-                        }
-                    }
+                    // Proceed to the scanning screen, which covers the app-data
+                    // preload with its animation — so no spinner needed here.
+                    allRequiredGranted -> onContinue()
                     !accessibilityEnabled -> PermissionHelper.openAccessibilitySettings(context)
                     !usageStatsEnabled -> PermissionHelper.openUsageStatsSettings(context)
                     !notificationsGranted -> notificationPermissionState?.launchPermissionRequest()
                     // Overlay is optional — if user doesn't grant it, we use UsageStatsBased fallback
                 }
             },
-            enabled = !isPreloading,
             colors = ButtonDefaults.buttonColors(
                 containerColor = GoNullGreen,
                 contentColor = GoNullBlack,
@@ -652,24 +640,14 @@ fun PermissionsPage(
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            if (isPreloading) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp),
-                    color = GoNullBlack,
-                    strokeWidth = 2.dp
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("Preparing your journey...", fontWeight = FontWeight.Bold)
-            } else {
-                Text(
-                    text = if (allRequiredGranted) {
-                        "Let's Start Our Journey"
-                    } else {
-                        "Set Up Next Permission ($missingCount left)"
-                    },
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            Text(
+                text = if (allRequiredGranted) {
+                    "Let's Start Our Journey"
+                } else {
+                    "Set Up Next Permission ($missingCount left)"
+                },
+                fontWeight = FontWeight.Bold
+            )
         }
 
         Spacer(modifier = Modifier.height(12.dp))
