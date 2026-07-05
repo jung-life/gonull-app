@@ -48,33 +48,51 @@ fun MainContent(database: AppDatabase) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val navController = rememberNavController()
 
-    // Track permission state reactively
+    // Resolve the start destination ONCE, synchronously, at first composition.
+    // Permission checks are synchronous system-service queries, so the correct
+    // entry point is known immediately for both new and returning users.
+    //
+    // Critically, this value must NOT be reactive. A startDestination that
+    // recomputes when permissions change makes NavHost re-navigate to the new
+    // start destination — which was yanking users off the onboarding permissions
+    // screen the instant Accessibility + Usage Stats became granted (before they
+    // reached Notifications or pressed "Let's Start Our Journey"). New users now
+    // leave onboarding solely via the button (onComplete → NavGraph).
+    val startDestination = remember {
+        val accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
+        val usageStatsEnabled = PermissionHelper.hasUsageStatsPermission(context)
+        val setupDone = PreferenceHelper.isInitialSetupComplete(context)
+        when {
+            !(accessibilityEnabled && usageStatsEnabled) -> Screen.Onboarding.route
+            !setupDone -> Screen.UsageInsights.route
+            else -> Screen.Home.route
+        }
+    }
+
+    // Track permissions for preload, blocking-strategy selection, and the
+    // returning-user correction below — never as the driver of onboarding exit.
     var hasAllPermissions by remember { mutableStateOf(false) }
     var hasCompletedSetup by remember { mutableStateOf(false) }
 
-    // Function to check all permissions. Display Over Apps is optional — if
-    // unavailable (OEM-disabled on some Vivo/Oppo devices), we fall back to
-    // UsageStatsBased blocking with a 2-second lag instead of instant.
-    fun checkPermissions() {
+    // Display Over Apps is optional — if unavailable (OEM-disabled on some
+    // Vivo/Oppo devices), fall back to UsageStatsBased blocking (2-second lag).
+    fun refreshPermissionState() {
         val accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
         val overlayEnabled = PermissionHelper.canDrawOverlays(context)
         val usageStatsEnabled = PermissionHelper.hasUsageStatsPermission(context)
 
         hasAllPermissions = accessibilityEnabled && usageStatsEnabled
         hasCompletedSetup = PreferenceHelper.isInitialSetupComplete(context)
-
-        // If permissions are met but overlay is missing, switch to UsageStatsBased
         if (hasAllPermissions && !overlayEnabled) {
-            val strategyManager = BlockingStrategyManager(context)
-            strategyManager.setStrategy(BlockingStrategy.UsageStatsBased)
+            BlockingStrategyManager(context).setStrategy(BlockingStrategy.UsageStatsBased)
         }
     }
 
-    // Check permissions on every resume (when returning from settings)
+    // Refresh on every resume (when returning from settings).
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                checkPermissions()
+                refreshPermissionState()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -83,39 +101,24 @@ fun MainContent(database: AppDatabase) {
         }
     }
 
-    // Initial check
     LaunchedEffect(Unit) {
-        checkPermissions()
+        refreshPermissionState()
     }
 
-    // Preload app data when permissions are granted
+    // Preload app data once permissions are granted.
     LaunchedEffect(hasAllPermissions) {
         if (hasAllPermissions) {
-            // Start preloading app data in the background
             launch {
                 AppDataCache.preload(context)
             }
         }
     }
 
-    // Determine start destination
-    val startDestination = when {
-        !hasAllPermissions -> Screen.Onboarding.route
-        !hasCompletedSetup -> Screen.UsageInsights.route
-        else -> Screen.Home.route
-    }
-
-    // Auto-skip onboarding ONLY for returning users who already finished setup.
-    // A returning user can briefly land on the onboarding route because
-    // `startDestination` is computed before `checkPermissions()` resolves the
-    // real permission state on the first frame; this corrects that.
-    //
-    // We deliberately do NOT forward *new* users (hasCompletedSetup == false)
-    // when permissions flip true mid-flow. During onboarding, granting
-    // Accessibility + Usage Stats makes `hasAllPermissions` true before the user
-    // has granted Notifications or pressed "Let's Start Our Journey" — auto-
-    // navigating here was yanking them off onboarding right after Usage Stats.
-    // New users leave onboarding solely via the button (onComplete → NavGraph).
+    // Returning-user correction ONLY. If the one-time startDestination guessed
+    // onboarding because the accessibility service hadn't re-bound at the first
+    // frame, forward a user who has ALREADY completed setup to Home. Guarded by
+    // hasCompletedSetup so new users (setup incomplete) are never auto-forwarded
+    // when permissions flip true mid-onboarding — that was the original bug.
     LaunchedEffect(hasAllPermissions, hasCompletedSetup) {
         val currentRoute = navController.currentDestination?.route
         if (currentRoute == Screen.Onboarding.route && hasAllPermissions && hasCompletedSetup) {
