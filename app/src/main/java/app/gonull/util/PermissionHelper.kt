@@ -107,4 +107,53 @@ object PermissionHelper {
         }
         context.startActivity(intent)
     }
+
+    /**
+     * Check if a package is a system app or critical service that must never be
+     * blockable. This includes launchers, system UI, Google Play Services, Samsung
+     * Wallet, etc. — anything that if blocked would make the device unusable.
+     */
+    fun isSystemOrCriticalService(packageName: String): Boolean {
+        return packageName.startsWith("com.android.systemui")
+                || packageName.startsWith("com.android.launcher")
+                || packageName.startsWith("com.android.settings")
+                || packageName.startsWith("com.android.phone")
+                || packageName.startsWith("com.android.internal")
+                || packageName.startsWith("com.google.android.launcher")
+                || packageName.startsWith("com.google.android.apps.nexuslauncher")
+                || packageName.startsWith("com.google.android.gms")  // Google Play Services
+                || packageName.startsWith("com.google.android.googlequicksearchbox")  // Google Assistant
+                || packageName.startsWith("com.google.android.apps.maps")
+                // Samsung
+                || packageName.startsWith("com.sec.android.app.launcher")
+                || packageName.startsWith("com.sec.android.launcher")
+                || packageName.startsWith("com.samsung.android.app.wallet")
+                || packageName.startsWith("com.samsung.android.app.settings")
+                || packageName.startsWith("com.samsung.android.knox")
+                || packageName.startsWith("com.samsung.android.messaging")
+                || packageName.startsWith("com.samsung.android.dialer")
+                || packageName.startsWith("com.samsung.android.contacts")
+                || packageName.startsWith("com.samsung.android.spay")
+                || packageName.startsWith("com.samsung.samsungpasskey")
+                || packageName.startsWith("com.sec.android.inputmethod")
+                || packageName.startsWith("com.sec.android.app.phoneprovider")
+                // MIUI (Xiaomi)
+                || packageName.startsWith("com.miui.home")
+                || packageName.startsWith("com.miui.launcher")
+                // Other OEM launchers & services (OnePlus, OPPO, Realme, Vivo, Huawei, etc.)
+                || packageName.startsWith("com.oneplus.launcher")
+                || packageName.startsWith("com.oppo.launcher")
+                || packageName.startsWith("com.oppo.cloud")
+                || packageName.startsWith("com.realme.launcher")
+                || packageName.startsWith("com.vivo.launcher")
+                || packageName.startsWith("com.vivo.theme")
+                || packageName.startsWith("com.huawei.android.launcher")
+                || packageName.startsWith("com.honor.launcher")
+                || packageName.startsWith("com.motorola.launcher")
+                || packageName.startsWith("com.nothing.launcher")
+                || packageName.startsWith("com.teslacoilsw.launcher")
+                || packageName.startsWith("com.microsoft.launcher")
+                || packageName.startsWith("com.actionlauncher")
+                || packageName.startsWith("com.novalauncher")
+    }
 }

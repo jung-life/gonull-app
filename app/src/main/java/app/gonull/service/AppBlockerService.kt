@@ -13,6 +13,7 @@ import app.gonull.data.local.AppDatabase
 import app.gonull.data.local.entity.UsageLogEntity
 import app.gonull.ui.screens.blocking.BlockingOverlayActivity
 import app.gonull.util.Constants
+import app.gonull.util.PermissionHelper
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 
@@ -114,7 +115,7 @@ class AppBlockerService : AccessibilityService() {
         // Ignore our own app, system/launcher packages, and keyboards. Blocking an
         // input method would leave the user unable to type anywhere on the device.
         if (packageName == applicationContext.packageName) return
-        if (isSystemOrLauncher(packageName)) return
+        if (PermissionHelper.isSystemOrCriticalService(packageName)) return
         if (protectedImePackages.contains(packageName)) return
 
         // ANALOG MODE: block everything except whitelist
@@ -250,32 +251,6 @@ class AppBlockerService : AccessibilityService() {
             Log.e(TAG, "Failed to load input-method packages", e)
             emptySet()
         }
-    }
-
-    private fun isSystemOrLauncher(packageName: String): Boolean {
-        return packageName.startsWith("com.android.systemui")
-                || packageName.startsWith("com.android.launcher")
-                || packageName.startsWith("com.google.android.launcher")
-                || packageName.startsWith("com.google.android.apps.nexuslauncher")
-                || packageName.startsWith("com.sec.android.app.launcher")
-                || packageName.startsWith("com.sec.android.launcher")
-                || packageName.startsWith("com.miui.home")
-                || packageName.startsWith("com.miui.launcher")
-                || packageName.startsWith("com.oneplus.launcher")
-                || packageName.startsWith("com.oppo.launcher")
-                || packageName.startsWith("com.realme.launcher")
-                || packageName.startsWith("com.vivo.launcher")
-                || packageName.startsWith("com.huawei.android.launcher")
-                || packageName.startsWith("com.honor.launcher")
-                || packageName.startsWith("com.motorola.launcher")
-                || packageName.startsWith("com.nothing.launcher")
-                || packageName.startsWith("com.teslacoilsw.launcher")
-                || packageName.startsWith("com.microsoft.launcher")
-                || packageName.startsWith("com.actionlauncher")
-                || packageName.startsWith("com.novalauncher")
-                || packageName.endsWith(".launcher")
-                || packageName.endsWith(".home")
-                || packageName.startsWith("com.android.settings")
     }
 
     companion object {

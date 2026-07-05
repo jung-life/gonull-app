@@ -68,7 +68,7 @@ class AppSelectionViewModel(
         viewModelScope.launch {
             val packageManager = context.packageManager
 
-            // Keyboards must never be blockable, and GoNull must not list itself.
+            // Never-blockable: keyboards, GoNull itself, system/critical services
             val imePackages = try {
                 val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
                 imm.inputMethodList.mapNotNull { it.packageName }.toSet()
@@ -82,6 +82,7 @@ class AppSelectionViewModel(
                     .filter { app ->
                         if (app.packageName == ownPackage) return@filter false
                         if (imePackages.contains(app.packageName)) return@filter false
+                        if (PermissionHelper.isSystemOrCriticalService(app.packageName)) return@filter false
                         val isUserApp = (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
                         val hasLauncher = packageManager.getLaunchIntentForPackage(app.packageName) != null
                         isUserApp || hasLauncher
