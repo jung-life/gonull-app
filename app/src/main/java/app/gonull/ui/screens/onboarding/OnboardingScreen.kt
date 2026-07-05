@@ -39,20 +39,6 @@ fun OnboardingScreen(
     val context = LocalContext.current
     var currentPage by remember { mutableStateOf(0) }
 
-    var accessibilityEnabled by remember { mutableStateOf(false) }
-    var overlayEnabled by remember { mutableStateOf(false) }
-    var usageStatsEnabled by remember { mutableStateOf(false) }
-
-    // Check permissions periodically
-    LaunchedEffect(Unit) {
-        while (true) {
-            accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
-            overlayEnabled = PermissionHelper.canDrawOverlays(context)
-            usageStatsEnabled = PermissionHelper.hasUsageStatsPermission(context)
-            kotlinx.coroutines.delay(1000)
-        }
-    }
-
     when (currentPage) {
         0 -> VideoIntroPage(
             onVideoEnd = { currentPage = 1 },
@@ -66,9 +52,6 @@ fun OnboardingScreen(
             onDecline = { currentPage = 1 }
         )
         3 -> PermissionsPage(
-            accessibilityEnabled = accessibilityEnabled,
-            overlayEnabled = overlayEnabled,
-            usageStatsEnabled = usageStatsEnabled,
             onBack = { currentPage = 2 },
             onContinue = onComplete
         )
@@ -495,13 +478,26 @@ fun BulletPoint(text: String) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalPermissionsApi::class)
 @Composable
 fun PermissionsPage(
-    accessibilityEnabled: Boolean,
-    overlayEnabled: Boolean,
-    usageStatsEnabled: Boolean,
     onBack: () -> Unit,
     onContinue: () -> Unit
 ) {
     val context = LocalContext.current
+
+    // Check permissions internally — PermissionsPage is solely responsible for
+    // this flow. No parent auto-navigation.
+    var accessibilityEnabled by remember { mutableStateOf(false) }
+    var overlayEnabled by remember { mutableStateOf(false) }
+    var usageStatsEnabled by remember { mutableStateOf(false) }
+
+    // Periodically refresh permission state
+    LaunchedEffect(Unit) {
+        while (true) {
+            accessibilityEnabled = PermissionHelper.isAccessibilityServiceEnabled(context)
+            overlayEnabled = PermissionHelper.canDrawOverlays(context)
+            usageStatsEnabled = PermissionHelper.hasUsageStatsPermission(context)
+            kotlinx.coroutines.delay(1000)
+        }
+    }
 
     // POST_NOTIFICATIONS is a runtime permission on Android 13+. Without it, the
     // unlock-timer countdown and session-expiry warnings are silently hidden.
