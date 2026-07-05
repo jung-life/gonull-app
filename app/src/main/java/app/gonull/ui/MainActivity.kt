@@ -105,25 +105,22 @@ fun MainContent(database: AppDatabase) {
         else -> Screen.Home.route
     }
 
-    // Navigate when permissions change
+    // Auto-skip onboarding ONLY for returning users who already finished setup.
+    // A returning user can briefly land on the onboarding route because
+    // `startDestination` is computed before `checkPermissions()` resolves the
+    // real permission state on the first frame; this corrects that.
+    //
+    // We deliberately do NOT forward *new* users (hasCompletedSetup == false)
+    // when permissions flip true mid-flow. During onboarding, granting
+    // Accessibility + Usage Stats makes `hasAllPermissions` true before the user
+    // has granted Notifications or pressed "Let's Start Our Journey" — auto-
+    // navigating here was yanking them off onboarding right after Usage Stats.
+    // New users leave onboarding solely via the button (onComplete → NavGraph).
     LaunchedEffect(hasAllPermissions, hasCompletedSetup) {
         val currentRoute = navController.currentDestination?.route
-        val targetRoute = when {
-            !hasAllPermissions -> Screen.Onboarding.route
-            !hasCompletedSetup -> Screen.UsageInsights.route
-            else -> Screen.Home.route
-        }
-
-        // Only navigate if we're on onboarding and permissions are now granted
-        if (currentRoute == Screen.Onboarding.route && hasAllPermissions) {
-            if (!hasCompletedSetup) {
-                navController.navigate(Screen.UsageInsights.route) {
-                    popUpTo(Screen.Onboarding.route) { inclusive = true }
-                }
-            } else {
-                navController.navigate(Screen.Home.route) {
-                    popUpTo(Screen.Onboarding.route) { inclusive = true }
-                }
+        if (currentRoute == Screen.Onboarding.route && hasAllPermissions && hasCompletedSetup) {
+            navController.navigate(Screen.Home.route) {
+                popUpTo(Screen.Onboarding.route) { inclusive = true }
             }
         }
     }
