@@ -25,7 +25,7 @@ GoNull is an Android app blocker that uses commitment contracts to help users br
 - **Run tests**: `./gradlew test`
 - **Android lint**: `./gradlew lint`
 - **Remotion dev**: `cd gonull-video && npm run dev`
-- **Render video**: `cd gonull-video && npm run build`
+- **Render video**: `cd gonull-video && npm run build` (renders directly into `app/src/main/res/raw/onboarding.mp4`, the asset the app actually plays — no manual copy needed; rebuild the APK afterward). Use `npm run render-preview` to render a scratch copy to `gonull-video/out/` instead.
 
 ## Key Architecture Patterns
 - Room entities use `@Entity` with table names (e.g., `blocked_apps`, `focus_modes`)

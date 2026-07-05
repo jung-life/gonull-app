@@ -4,8 +4,9 @@
   "description": "Onboarding video for GoNull app",
   "scripts": {
     "dev": "remotion studio",
-    "build": "remotion render GoNullOnboarding out/onboarding.mp4",
-    "render": "remotion render GoNullOnboarding out/onboarding.mp4",
+    "build": "remotion render GoNullOnboarding ../app/src/main/res/raw/onboarding.mp4",
+    "render": "remotion render GoNullOnboarding ../app/src/main/res/raw/onboarding.mp4",
+    "render-preview": "remotion render GoNullOnboarding out/onboarding.mp4",
     "render-gif": "remotion render GoNullOnboarding out/onboarding.gif --image-format=png"
   },
   "keywords": [
