@@ -30,6 +30,7 @@ import app.gonull.util.PermissionHelper
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberPermissionState
+import kotlinx.coroutines.launch
 
 @Composable
 fun OnboardingScreen(
@@ -518,22 +519,11 @@ fun PermissionsPage(
         listOf(accessibilityEnabled, usageStatsEnabled, notificationsGranted)
             .count { !it }
     var isPreloading by remember { mutableStateOf(false) }
-    var preloadComplete by remember { mutableStateOf(false) }
-    var showAllGrantedBriefly by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
-    // Auto-preload apps when all permissions are granted, but show a brief
-    // confirmation (500ms) so user can see the final permission was granted
-    // before the screen navigates away. This prevents the "rush" feeling.
-    LaunchedEffect(allRequiredGranted) {
-        if (allRequiredGranted && !preloadComplete && !isPreloading) {
-            isPreloading = true
-            showAllGrantedBriefly = true
-            kotlinx.coroutines.delay(500)  // Brief visual confirmation
-            app.gonull.data.AppDataCache.preload(context)
-            preloadComplete = true
-            isPreloading = false
-        }
-    }
+    // Don't auto-navigate. User must click "Let's Start Our Journey" button
+    // after all permissions are granted. This gives them control and prevents
+    // the jarring "rush" to the next screen.
 
     Column(
         modifier = Modifier
@@ -632,12 +622,22 @@ fun PermissionsPage(
         }
 
         // Continue button. When permissions are still missing, this acts as a
-        // shortcut that opens the first ungranted permission rather than being a
-        // dead, disabled button (which reads as "broken" to users tapping it).
+        // shortcut that opens the first ungranted permission. When all are granted,
+        // user must click this button explicitly to proceed (no auto-navigation).
         Button(
             onClick = {
                 when {
-                    allRequiredGranted -> onContinue()
+                    allRequiredGranted -> {
+                        // User clicked to proceed — preload and navigate
+                        isPreloading = true
+                        scope.launch {
+                            try {
+                                app.gonull.data.AppDataCache.preload(context)
+                            } finally {
+                                onContinue()
+                            }
+                        }
+                    }
                     !accessibilityEnabled -> PermissionHelper.openAccessibilitySettings(context)
                     !usageStatsEnabled -> PermissionHelper.openUsageStatsSettings(context)
                     !notificationsGranted -> notificationPermissionState?.launchPermissionRequest()
@@ -656,36 +656,23 @@ fun PermissionsPage(
                 .fillMaxWidth()
                 .height(56.dp)
         ) {
-            when {
-                isPreloading -> {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(20.dp),
-                        color = GoNullBlack,
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("Preparing your journey...", fontWeight = FontWeight.Bold)
-                }
-                showAllGrantedBriefly && allRequiredGranted -> {
-                    Icon(
-                        Icons.Default.Check,
-                        contentDescription = "All permissions granted",
-                        modifier = Modifier.size(24.dp),
-                        tint = GoNullBlack
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text("All set! Loading...", fontWeight = FontWeight.Bold)
-                }
-                else -> {
-                    Text(
-                        text = if (allRequiredGranted) {
-                            "Let's Start Our Journey"
-                        } else {
-                            "Set Up Next Permission ($missingCount left)"
-                        },
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+            if (isPreloading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = GoNullBlack,
+                    strokeWidth = 2.dp
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Preparing your journey...", fontWeight = FontWeight.Bold)
+            } else {
+                Text(
+                    text = if (allRequiredGranted) {
+                        "Let's Start Our Journey"
+                    } else {
+                        "Set Up Next Permission ($missingCount left)"
+                    },
+                    fontWeight = FontWeight.Bold
+                )
             }
         }
 
