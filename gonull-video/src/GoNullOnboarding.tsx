@@ -28,21 +28,21 @@ const IntroScene: React.FC = () => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
 
-  const opacity = interpolate(frame, [0, 15], [0, 1], {
+  const opacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateRight: "clamp",
   });
 
-  const textOpacity = interpolate(frame, [20, 36], [0, 1], {
+  const textOpacity = interpolate(frame, [18, 48], [0, 1], {
     extrapolateRight: "clamp",
   });
 
   // Second line fades in after the headline so they appear one after another.
-  const subtitleOpacity = interpolate(frame, [42, 58], [0, 1], {
+  const subtitleOpacity = interpolate(frame, [56, 86], [0, 1], {
     extrapolateRight: "clamp",
   });
 
   const hourScale = spring({
-    frame: frame - 50,
+    frame: frame - 92,
     fps,
     config: { damping: 12 },
   });
@@ -163,7 +163,7 @@ const LogoScene: React.FC = () => {
     config: { damping: 10, stiffness: 100 },
   });
 
-  const textOpacity = interpolate(frame, [30, 50], [0, 1], {
+  const textOpacity = interpolate(frame, [28, 64], [0, 1], {
     extrapolateRight: "clamp",
   });
 
@@ -617,32 +617,173 @@ const CTAScene: React.FC = () => {
   );
 };
 
+// The Science: why willpower isn't enough, and how friction rewires the loop.
+const NeuroScience: React.FC<{ point: string; detail: string; delay: number; accent: string }> = ({
+  point,
+  detail,
+  delay,
+  accent,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const slideIn = spring({ frame: frame - delay, fps, config: { damping: 16 } });
+  const opacity = interpolate(frame, [delay, delay + 18], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 28,
+        opacity,
+        transform: `translateY(${interpolate(slideIn, [0, 1], [40, 0])}px)`,
+      }}
+    >
+      <div
+        style={{
+          minWidth: 14,
+          height: 14,
+          borderRadius: 7,
+          marginTop: 16,
+          backgroundColor: accent,
+          boxShadow: `0 0 18px ${accent}`,
+        }}
+      />
+      <div>
+        <div
+          style={{
+            color: colors.white,
+            fontSize: 42,
+            fontWeight: "bold",
+            fontFamily: "system-ui, sans-serif",
+            lineHeight: 1.2,
+          }}
+        >
+          {point}
+        </div>
+        <div
+          style={{
+            color: colors.gray,
+            fontSize: 30,
+            marginTop: 10,
+            fontFamily: "system-ui, sans-serif",
+            lineHeight: 1.3,
+          }}
+        >
+          {detail}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ScienceScene: React.FC = () => {
+  const frame = useCurrentFrame();
+
+  const titleOpacity = interpolate(frame, [0, 24], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  // Closing synthesis line fades in after the three points have landed.
+  const synthesisOpacity = interpolate(frame, [150, 178], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill
+      style={{
+        backgroundColor: colors.black,
+        padding: 70,
+        justifyContent: "center",
+      }}
+    >
+      <h2
+        style={{
+          color: colors.green,
+          fontSize: 52,
+          fontWeight: "bold",
+          marginBottom: 56,
+          opacity: titleOpacity,
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        It's not you. It's the design.
+      </h2>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 40 }}>
+        <NeuroScience
+          point="Apps run on dopamine"
+          detail="Endless feeds use unpredictable rewards — the same loop that drives slot machines."
+          delay={30}
+          accent={colors.red}
+        />
+        <NeuroScience
+          point="Willpower loses in the moment"
+          detail="Your impulsive brain reacts faster than the part that plans ahead."
+          delay={70}
+          accent={colors.yellow}
+        />
+        <NeuroScience
+          point="GoNull adds a pause"
+          detail="A few seconds of friction lets your thinking brain catch up — and, repeated, the craving fades."
+          delay={110}
+          accent={colors.green}
+        />
+      </div>
+
+      <p
+        style={{
+          color: colors.white,
+          fontSize: 38,
+          fontWeight: "bold",
+          marginTop: 60,
+          textAlign: "center",
+          opacity: synthesisOpacity,
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        We don't fight your willpower.
+        <br />
+        We help you rebuild the habit.
+      </p>
+    </AbsoluteFill>
+  );
+};
+
 // Main Composition
 export const GoNullOnboarding: React.FC = () => {
   return (
     <AbsoluteFill style={{ backgroundColor: colors.black }}>
-      {/* Scene 1: The Problem (0-90 frames = 3 seconds) */}
-      <Sequence from={0} durationInFrames={90}>
+      {/* Scene 1: The Problem (0-135 = 4.5s) — text lingers before the cut */}
+      <Sequence from={0} durationInFrames={135}>
         <IntroScene />
       </Sequence>
 
-      {/* Scene 2: Logo Reveal (90-180 frames = 3 seconds) */}
-      <Sequence from={90} durationInFrames={90}>
+      {/* Scene 2: Logo Reveal (135-260 = ~4s) */}
+      <Sequence from={135} durationInFrames={125}>
         <LogoScene />
       </Sequence>
 
-      {/* Scene 3: Progressive Friction Feature (180-300 frames = 4 seconds) */}
-      <Sequence from={180} durationInFrames={120}>
+      {/* Scene 3: The Science (260-480 = ~7.3s) — the neuroscience level-set */}
+      <Sequence from={260} durationInFrames={220}>
+        <ScienceScene />
+      </Sequence>
+
+      {/* Scene 4: Progressive Friction Feature (480-640 = ~5.3s) */}
+      <Sequence from={480} durationInFrames={160}>
         <FrictionFeatureScene />
       </Sequence>
 
-      {/* Scene 4: Usage Mirror & Streaks (300-390 frames = 3 seconds) */}
-      <Sequence from={300} durationInFrames={90}>
+      {/* Scene 5: Usage Mirror & Streaks (640-770 = ~4.3s) */}
+      <Sequence from={640} durationInFrames={130}>
         <StatsFeatureScene />
       </Sequence>
 
-      {/* Scene 5: Call to Action (390-450 frames = 2 seconds) */}
-      <Sequence from={390} durationInFrames={60}>
+      {/* Scene 6: Call to Action (770-870 = ~3.3s) */}
+      <Sequence from={770} durationInFrames={100}>
         <CTAScene />
       </Sequence>
     </AbsoluteFill>
