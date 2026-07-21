@@ -10,6 +10,7 @@ object PreferenceHelper {
     private const val KEY_INITIAL_SETUP_COMPLETE = "has_completed_initial_setup"
     private const val KEY_BOREDOM_BEFORE_UNLOCK = "boredom_before_unlock_enabled"
     private const val KEY_REMOVAL_REQUESTED_AT = "removal_requested_at"
+    private const val KEY_LAST_REVIEW_PROMPT_AT = "last_review_prompt_at"
 
     fun isInitialSetupComplete(context: Context): Boolean {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -49,5 +50,20 @@ object PreferenceHelper {
     fun clearRemovalRequest(context: Context) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         prefs.edit().remove(KEY_REMOVAL_REQUESTED_AT).apply()
+    }
+
+    /**
+     * Timestamp (epoch millis) of the last time we surfaced the weekly "how is
+     * this working for you" reflection. 0L means never shown. Used to gently
+     * prompt periodic review without nagging.
+     */
+    fun getLastReviewPromptAt(context: Context): Long {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getLong(KEY_LAST_REVIEW_PROMPT_AT, 0L)
+    }
+
+    fun setLastReviewPromptAt(context: Context, timestampMillis: Long) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putLong(KEY_LAST_REVIEW_PROMPT_AT, timestampMillis).apply()
     }
 }

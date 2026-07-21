@@ -30,6 +30,7 @@ import app.gonull.ui.components.JournalPromptDialog
 import app.gonull.ui.components.MorningCommitmentCard
 import app.gonull.ui.components.QuickFocusModeRow
 import app.gonull.ui.components.RecentJournalCard
+import app.gonull.ui.components.WorkingInBackgroundCard
 import app.gonull.ui.theme.*
 import app.gonull.util.DateHelper
 import kotlinx.coroutines.launch
@@ -261,6 +262,11 @@ fun HomeScreen(
                     timeSavedMinutes = viewModel.timeSavedMinutes,
                     onTap = onNavigateToStats
                 )
+            }
+
+            // Anti-pattern reframe: less usage = success, with a weekly reflection nudge.
+            item {
+                WorkingInBackgroundCard(onReflect = onNavigateToJournal)
             }
 
             // Daily Intel
