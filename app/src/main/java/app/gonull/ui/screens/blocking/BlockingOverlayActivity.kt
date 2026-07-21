@@ -864,7 +864,10 @@ fun BunkerModeDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = GoNullSurface,
-        title = { Text("Bunker Mode Access", color = GoNullRed) },
+        title = {
+            if (step == 2) Text("Access Granted", color = GoNullGreen)
+            else Text("Bunker Mode Access", color = GoNullRed)
+        },
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 when(step) {
@@ -945,33 +948,68 @@ fun BunkerModeDialog(
                             Text("Different question", color = GoNullYellow)
                         }
                     }
+                    2 -> {
+                        // Affirmation beat — acknowledge the effort and set an
+                        // intention instead of dropping the user straight into the app.
+                        Text("🧠", style = MaterialTheme.typography.headlineLarge)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            "Your thinking brain won.",
+                            color = GoNullGreen,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "You chose this on purpose — that's the whole point. Use it with intention, then come back.",
+                            color = GoNullGray,
+                            textAlign = TextAlign.Center
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "The less you need this door, the better GoNull is working.",
+                            color = GoNullYellow,
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         },
         confirmButton = {
             TextButton(onClick = {
-                if (step == 0) {
-                    if (inputCode == requiredCode) {
+                when (step) {
+                    0 -> if (inputCode == requiredCode) {
                         codeError = false
                         step++
                     } else {
                         codeError = true
                     }
-                } else if (step == 1) {
-                    if (mathAnswer == mathProblem.second) {
+                    1 -> if (mathAnswer == mathProblem.second) {
                         mathError = false
-                        onVerified()
+                        step++ // -> affirmation beat, not an instant cut to the app
                     } else {
                         mathError = true
                     }
+                    2 -> onVerified()
                 }
             }) {
-                Text("Verify", color = GoNullRed)
+                Text(
+                    text = if (step == 2) "Open with intention" else "Verify",
+                    color = if (step == 2) GoNullGreen else GoNullRed
+                )
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("I'll wait for the timer", color = GoNullGray)
+                Text(
+                    text = when (step) {
+                        2 -> "Actually, I don't need it"
+                        else -> "I'll wait for the timer"
+                    },
+                    color = GoNullGray
+                )
             }
         }
     )
