@@ -46,12 +46,12 @@ fun gitVersionCode(): Int {
 
 android {
     namespace = "app.gonull"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "app.gonull"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         versionCode = gitVersionCode()
         versionName = "1.0.6"
 
