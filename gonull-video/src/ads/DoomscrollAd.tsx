@@ -159,9 +159,9 @@ export const DoomscrollAd: React.FC<{ feedBlur?: number }> = ({ feedBlur = 0 }) 
     extrapolateRight: "clamp",
   });
 
-  // Music: fade in at the start, fade out under the end card.
+  // Music: fade in at the start, fade out under the extended end card.
   const musicVolume = (f: number) =>
-    interpolate(f, [0, 18, 336, 360], [0, 0.85, 0.85, 0], {
+    interpolate(f, [0, 18, 366, 390], [0, 0.85, 0.85, 0], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     });
@@ -184,7 +184,7 @@ export const DoomscrollAd: React.FC<{ feedBlur?: number }> = ({ feedBlur = 0 }) 
               textAlign: "center",
             }}
           >
-            Still scrolling?
+            Endless scrolling?
           </div>
         </Beat>
 
@@ -199,9 +199,9 @@ export const DoomscrollAd: React.FC<{ feedBlur?: number }> = ({ feedBlur = 0 }) 
               lineHeight: 1.2,
             }}
           >
-            And it's still
+            And still
             <br />
-            not enough.
+            not <span style={{ color: colors.red }}>enough?</span>
           </div>
         </Beat>
 
