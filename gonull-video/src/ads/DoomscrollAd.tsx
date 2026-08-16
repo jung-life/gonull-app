@@ -1,8 +1,10 @@
 import React from "react";
 import {
   AbsoluteFill,
+  Audio,
   interpolate,
   spring,
+  staticFile,
   useCurrentFrame,
   useVideoConfig,
 } from "remotion";
@@ -10,25 +12,32 @@ import { colors, fonts } from "../theme";
 import { FeedScroll } from "./FeedScroll";
 
 /**
- * "The Scroll" — 6s (180f @ 30fps), 1080x1920.
- * Doomscroll -> honest questions -> reassurance -> Go/Null/empty reveal + CTA.
- * Silent/text-first (autoplay-muted safe). Copy avoids medical claims.
+ * "The Scroll" — vertical doomscroll-interrupt ad, 1080x1920, 360f @ 30fps (12s).
+ * Doomscroll (real feed footage) -> honest questions -> reassurance ->
+ * Go/null/"free your mind" reveal + CTA. Music from public/song.mp4.
+ *
+ * Pacing is deliberately unhurried: each text beat holds ~2s, the reveal ~2.5s.
+ * Copy avoids medical claims per Terms ("designed that way", not "cure").
  */
 
-// A centered question line that fades in then out over its window.
-const Beat: React.FC<{
-  start: number;
-  end: number;
-  children: React.ReactNode;
-}> = ({ start, end, children }) => {
+// Media lives in public/ (served by Remotion via staticFile).
+const FEED_SRC = staticFile("feed.mp4");
+const SONG_SRC = staticFile("song.mp4");
+
+// A centered text beat that fades in, holds, then fades out over its window.
+const Beat: React.FC<{ start: number; end: number; children: React.ReactNode }> = ({
+  start,
+  end,
+  children,
+}) => {
   const frame = useCurrentFrame();
   const opacity = interpolate(
     frame,
-    [start, start + 9, end - 9, end],
+    [start, start + 12, end - 12, end],
     [0, 1, 1, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
-  const rise = interpolate(frame, [start, start + 12], [24, 0], {
+  const rise = interpolate(frame, [start, start + 16], [26, 0], {
     extrapolateRight: "clamp",
   });
   return (
@@ -51,23 +60,23 @@ const Reveal: React.FC = () => {
   const { fps } = useVideoConfig();
 
   const logoScale = spring({
-    frame: frame - 150,
+    frame: frame - 285,
     fps,
-    config: { damping: 11, stiffness: 120 },
+    config: { damping: 12, stiffness: 110 },
   });
-  const glow = interpolate(frame, [150, 168, 180], [0, 26, 18], {
+  const glow = interpolate(frame, [285, 320, 360], [0, 26, 20], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const wordOpacity = interpolate(frame, [158, 168], [0, 1], {
+  const wordOpacity = interpolate(frame, [300, 315], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const tagOpacity = interpolate(frame, [166, 176], [0, 1], {
+  const tagOpacity = interpolate(frame, [315, 330], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
-  const ctaOpacity = interpolate(frame, [172, 180], [0, 1], {
+  const ctaOpacity = interpolate(frame, [332, 348], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -117,7 +126,7 @@ const Reveal: React.FC = () => {
           opacity: tagOpacity,
         }}
       >
-        empty your mind.
+        free your mind.
       </div>
 
       <div
@@ -138,25 +147,34 @@ const Reveal: React.FC = () => {
 export const DoomscrollAd: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // Feed dims as the interrupt begins.
-  const dim = interpolate(frame, [58, 96], [0, 0.66], {
+  // Feed stays clear for the first ~3s, then dims as the interrupt begins.
+  const dim = interpolate(frame, [90, 130], [0, 0.66], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
   // Crossfade the feed+questions layer out into the reveal.
-  const feedOpacity = interpolate(frame, [146, 156], [1, 0], {
+  const feedOpacity = interpolate(frame, [280, 298], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
+  // Music: fade in at the start, fade out under the end card.
+  const musicVolume = (f: number) =>
+    interpolate(f, [0, 18, 336, 360], [0, 0.85, 0.85, 0], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+    });
+
   return (
     <AbsoluteFill style={{ backgroundColor: colors.black }}>
-      {/* Layer 1: feed + questions */}
-      <AbsoluteFill style={{ opacity: feedOpacity }}>
-        <FeedScroll dim={dim} />
+      <Audio src={SONG_SRC} volume={musicVolume} />
 
-        <Beat start={68} end={98}>
+      {/* Layer 1: real feed footage + questions */}
+      <AbsoluteFill style={{ opacity: feedOpacity }}>
+        <FeedScroll backgroundVideoSrc={FEED_SRC} dim={dim} videoPlaybackRate={0.55} />
+
+        <Beat start={100} end={165}>
           <div
             style={{
               fontSize: 88,
@@ -170,7 +188,7 @@ export const DoomscrollAd: React.FC = () => {
           </div>
         </Beat>
 
-        <Beat start={98} end={128}>
+        <Beat start={165} end={230}>
           <div
             style={{
               fontSize: 76,
@@ -187,7 +205,7 @@ export const DoomscrollAd: React.FC = () => {
           </div>
         </Beat>
 
-        <Beat start={128} end={150}>
+        <Beat start={230} end={290}>
           <div style={{ textAlign: "center", fontFamily: fonts.mono, fontWeight: 700, lineHeight: 1.25 }}>
             <div style={{ fontSize: 72, color: colors.white }}>It's not you.</div>
             <div style={{ fontSize: 72, color: colors.green, marginTop: 8 }}>
@@ -198,7 +216,7 @@ export const DoomscrollAd: React.FC = () => {
       </AbsoluteFill>
 
       {/* Layer 2: reveal + CTA */}
-      {frame >= 146 && <Reveal />}
+      {frame >= 278 && <Reveal />}
     </AbsoluteFill>
   );
 };

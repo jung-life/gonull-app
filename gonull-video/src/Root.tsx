@@ -14,11 +14,11 @@ export const RemotionRoot: React.FC = () => {
         width={1080}
         height={1920}
       />
-      {/* Marketing: "The Scroll" — vertical doomscroll-interrupt ad (~7s, holds the end card) */}
+      {/* Marketing: "The Scroll" — vertical doomscroll-interrupt ad (12s, real feed + music) */}
       <Composition
         id="DoomscrollAd"
         component={DoomscrollAd}
-        durationInFrames={210}
+        durationInFrames={360}
         fps={30}
         width={1080}
         height={1920}

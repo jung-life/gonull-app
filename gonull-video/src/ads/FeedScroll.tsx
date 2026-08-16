@@ -90,7 +90,8 @@ const PostCard: React.FC<{ post: Post }> = ({ post }) => (
 export const FeedScroll: React.FC<{
   backgroundVideoSrc?: string;
   dim?: number; // 0..1 dark overlay
-}> = ({ backgroundVideoSrc, dim = 0 }) => {
+  videoPlaybackRate?: number; // slow real footage for a more hypnotic scroll
+}> = ({ backgroundVideoSrc, dim = 0, videoPlaybackRate = 0.7 }) => {
   const frame = useCurrentFrame();
 
   // Hypnotic auto-scroll: accelerates (lost time), then decelerates as the
@@ -106,6 +107,7 @@ export const FeedScroll: React.FC<{
         <OffthreadVideo
           src={backgroundVideoSrc}
           muted
+          playbackRate={videoPlaybackRate}
           style={{ width: "100%", height: "100%", objectFit: "cover" }}
         />
       ) : (
