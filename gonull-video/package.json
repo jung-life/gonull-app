@@ -7,7 +7,8 @@
     "build": "remotion render GoNullOnboarding ../app/src/main/res/raw/onboarding.mp4",
     "render": "remotion render GoNullOnboarding ../app/src/main/res/raw/onboarding.mp4",
     "render-preview": "remotion render GoNullOnboarding out/onboarding.mp4",
-    "render-gif": "remotion render GoNullOnboarding out/onboarding.gif --image-format=png"
+    "render-gif": "remotion render GoNullOnboarding out/onboarding.gif --image-format=png",
+    "render-ad": "remotion render DoomscrollAd out/doomscroll-6s.mp4"
   },
   "keywords": [
     "remotion",
@@ -19,6 +20,7 @@
   "dependencies": {
     "@remotion/bundler": "^4.0.417",
     "@remotion/cli": "^4.0.417",
+    "@remotion/google-fonts": "^4.0.512",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "remotion": "^4.0.417"
