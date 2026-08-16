@@ -144,7 +144,7 @@ const Reveal: React.FC = () => {
   );
 };
 
-export const DoomscrollAd: React.FC = () => {
+export const DoomscrollAd: React.FC<{ feedBlur?: number }> = ({ feedBlur = 0 }) => {
   const frame = useCurrentFrame();
 
   // Feed stays clear for the first ~3s, then dims as the interrupt begins.
@@ -172,7 +172,7 @@ export const DoomscrollAd: React.FC = () => {
 
       {/* Layer 1: real feed footage + questions */}
       <AbsoluteFill style={{ opacity: feedOpacity }}>
-        <FeedScroll backgroundVideoSrc={FEED_SRC} dim={dim} videoPlaybackRate={0.55} />
+        <FeedScroll backgroundVideoSrc={FEED_SRC} dim={dim} videoPlaybackRate={0.55} videoBlur={feedBlur} />
 
         <Beat start={100} end={165}>
           <div

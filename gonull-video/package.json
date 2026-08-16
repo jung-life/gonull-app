@@ -8,7 +8,8 @@
     "render": "remotion render GoNullOnboarding ../app/src/main/res/raw/onboarding.mp4",
     "render-preview": "remotion render GoNullOnboarding out/onboarding.mp4",
     "render-gif": "remotion render GoNullOnboarding out/onboarding.gif --image-format=png",
-    "render-ad": "remotion render DoomscrollAd out/doomscroll.mp4"
+    "render-ad": "remotion render DoomscrollAd out/doomscroll.mp4",
+    "render-ad-blur": "remotion render DoomscrollAdBlurred out/doomscroll-blurred.mp4"
   },
   "keywords": [
     "remotion",

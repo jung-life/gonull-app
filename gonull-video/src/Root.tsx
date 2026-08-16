@@ -22,6 +22,18 @@ export const RemotionRoot: React.FC = () => {
         fps={30}
         width={1080}
         height={1920}
+        defaultProps={{ feedBlur: 0 }}
+      />
+      {/* Publish-safe variant: same ad with the real feed blurred so faces/logos
+          /content aren't identifiable (avoids right-of-publicity/copyright risk). */}
+      <Composition
+        id="DoomscrollAdBlurred"
+        component={DoomscrollAd}
+        durationInFrames={360}
+        fps={30}
+        width={1080}
+        height={1920}
+        defaultProps={{ feedBlur: 30 }}
       />
     </>
   );

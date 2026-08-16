@@ -91,7 +91,8 @@ export const FeedScroll: React.FC<{
   backgroundVideoSrc?: string;
   dim?: number; // 0..1 dark overlay
   videoPlaybackRate?: number; // slow real footage for a more hypnotic scroll
-}> = ({ backgroundVideoSrc, dim = 0, videoPlaybackRate = 0.7 }) => {
+  videoBlur?: number; // px blur — obscures identifiable faces/logos/content
+}> = ({ backgroundVideoSrc, dim = 0, videoPlaybackRate = 0.7, videoBlur = 0 }) => {
   const frame = useCurrentFrame();
 
   // Hypnotic auto-scroll: accelerates (lost time), then decelerates as the
@@ -108,7 +109,14 @@ export const FeedScroll: React.FC<{
           src={backgroundVideoSrc}
           muted
           playbackRate={videoPlaybackRate}
-          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            // scale up so the heavier blur doesn't reveal the frame edges
+            transform: videoBlur ? "scale(1.25)" : undefined,
+            filter: videoBlur ? `blur(${videoBlur}px)` : undefined,
+          }}
         />
       ) : (
         <div style={{ transform: `translateY(${scrollY}px)`, padding: "56px 56px 0" }}>
