@@ -324,6 +324,18 @@ fun SettingsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
+                            text = "Terms of Service",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GoNullGreen,
+                            textDecoration = TextDecoration.Underline,
+                            modifier = Modifier.clickable {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(Constants.TERMS_OF_SERVICE_URL))
+                                )
+                            }
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
                             text = "Send beta feedback",
                             style = MaterialTheme.typography.bodyMedium,
                             color = GoNullGreen,

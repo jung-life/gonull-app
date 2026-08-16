@@ -398,20 +398,39 @@ fun AccessibilityDisclosurePage(
 @Composable
 fun PrivacyPolicyLink() {
     val context = LocalContext.current
-    Text(
-        text = "Privacy Policy",
-        style = MaterialTheme.typography.bodySmall,
-        color = GoNullGray,
-        textAlign = TextAlign.Center,
-        textDecoration = TextDecoration.Underline,
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = "Privacy Policy",
+            style = MaterialTheme.typography.bodySmall,
+            color = GoNullGray,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable {
                 context.startActivity(
                     Intent(Intent.ACTION_VIEW, Uri.parse(Constants.PRIVACY_POLICY_URL))
                 )
             }
-    )
+        )
+        Text(
+            text = "  •  ",
+            style = MaterialTheme.typography.bodySmall,
+            color = GoNullGray
+        )
+        Text(
+            text = "Terms of Service",
+            style = MaterialTheme.typography.bodySmall,
+            color = GoNullGray,
+            textDecoration = TextDecoration.Underline,
+            modifier = Modifier.clickable {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(Constants.TERMS_OF_SERVICE_URL))
+                )
+            }
+        )
+    }
 }
 
 @Composable

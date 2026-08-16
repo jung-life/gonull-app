@@ -3,6 +3,7 @@ package app.gonull.util
 object Constants {
     // Public-facing URLs
     const val PRIVACY_POLICY_URL = "https://gonull.app/privacy"
+    const val TERMS_OF_SERVICE_URL = "https://gonull.app/terms"
     const val BETA_FEEDBACK_URL = "https://docs.google.com/forms/d/e/1FAIpQLSdWKNJ4k7niGWrkikrRzSllXH5CaRljbh2vQ7PmUAK8QlbsXg/viewform"
 
     // Default settings
