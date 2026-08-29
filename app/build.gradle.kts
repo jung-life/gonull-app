@@ -121,6 +121,17 @@ android {
 }
 
 dependencies {
+    // Force a modern androidx.fragment. play-services-basement (pulled in by
+    // Firebase Crashlytics) drags in the ancient fragment 1.1.0, which Google
+    // Play flags as outdated. The app is Compose-only and uses no fragments
+    // directly, so this constraint just bumps the transitive version to a
+    // supported one without adding a real dependency edge.
+    constraints {
+        implementation("androidx.fragment:fragment:1.6.2") {
+            because("play-services-basement pulls outdated fragment 1.1.0 (Play Console warning)")
+        }
+    }
+
     // Core
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
