@@ -9,7 +9,8 @@
     "render-preview": "remotion render GoNullOnboarding out/onboarding.mp4",
     "render-gif": "remotion render GoNullOnboarding out/onboarding.gif --image-format=png",
     "render-ad": "remotion render DoomscrollAd out/doomscroll.mp4",
-    "render-ad-blur": "remotion render DoomscrollAdBlurred out/doomscroll-blurred.mp4"
+    "render-ad-blur": "remotion render DoomscrollAdBlurred out/doomscroll-blurred.mp4",
+    "render-slides": "remotion still Slide1 out/slides/slide-1.png && remotion still Slide2 out/slides/slide-2.png && remotion still Slide3 out/slides/slide-3.png && remotion still Slide4 out/slides/slide-4.png && remotion still Slide5 out/slides/slide-5.png"
   },
   "keywords": [
     "remotion",
